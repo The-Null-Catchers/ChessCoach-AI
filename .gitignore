@@ -1,0 +1,11 @@
+.env
+__pycache__/
+.pytest_cache/
+.venv/
+node_modules/
+.next/
+.dart_tool/
+build/
+.idea/
+.vscode/
+.DS_Store
