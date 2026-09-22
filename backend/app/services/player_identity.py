@@ -48,31 +48,55 @@ def link_game_players(
         ("white", game.white_name, _rating(white_rating)),
         ("black", game.black_name, _rating(black_rating)),
     ]
-    linked: list[GamePlayer] = []
+
+    players: dict[str, GamePlayer] = {}
     for color, name, rating in specs:
         player = db.scalar(select(GamePlayer).where(
             GamePlayer.game_id == game.id,
             GamePlayer.color == color,
         ))
-        matched_user = user_id if _normalize(name) in aliases else None
         if player is None:
-            player = GamePlayer(
-                game_id=game.id,
-                user_id=matched_user,
-                color=color,
-                name=name,
-                rating=rating,
-            )
+            player = GamePlayer(game_id=game.id, color=color, name=name, rating=rating)
             db.add(player)
         else:
             player.name = name
             player.rating = player.rating or rating
-            if matched_user:
-                player.user_id = user_id
-        linked.append(player)
+        players[color] = player
     db.flush()
-    return linked[0], linked[1]
 
+    explicit = _normalize(explicit_name)
+    explicit_matches = [
+        color for color, name, _ in specs
+        if explicit and _normalize(name) == explicit
+    ]
+    existing_matches = [
+        color for color, player in players.items()
+        if player.user_id == user_id
+    ]
+    alias_matches = [
+        color for color, name, _ in specs
+        if _normalize(name) in aliases
+    ]
+
+    selected_color: str | None = None
+    if len(explicit_matches) == 1:
+        selected_color = explicit_matches[0]
+    elif len(existing_matches) == 1:
+        selected_color = existing_matches[0]
+    elif len(alias_matches) == 1:
+        selected_color = alias_matches[0]
+
+    for color, player in players.items():
+        if selected_color is not None:
+            if color == selected_color:
+                player.user_id = user_id
+            elif player.user_id == user_id:
+                player.user_id = None
+        elif player.user_id == user_id:
+            player.user_id = None
+
+    db.flush()
+    return players["white"], players["black"]
 
 def backfill_owned_games(db: Session, user_id: str) -> None:
     games = db.scalars(select(Game).where(Game.user_id == user_id)).all()

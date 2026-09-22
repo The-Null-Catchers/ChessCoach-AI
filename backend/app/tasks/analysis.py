@@ -136,9 +136,10 @@ def analyze_game(self, game_id: str, job_id: str, depth: int = 16):
                     ):
                         continue
                     if move.clock_seconds is None:
+                        previous_clock = None
                         continue
                     move_analysis = db.scalar(select(EngineAnalysis).where(EngineAnalysis.move_id == move.id))
-                    if move_analysis:
+                    if move_analysis and previous_clock is not None:
                         signals = detect_time_management(
                             before_clock=previous_clock,
                             after_clock=move.clock_seconds,

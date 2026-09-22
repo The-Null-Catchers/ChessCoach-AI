@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
+import chess
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
@@ -215,6 +216,14 @@ def attempt_puzzle(
     puzzle = db.scalar(select(Puzzle).where(Puzzle.id == puzzle_id, Puzzle.user_id == user_id))
     if not puzzle:
         raise HTTPException(404, "Puzzle not found")
+
+    try:
+        board = chess.Board(puzzle.fen)
+        submitted = chess.Move.from_uci(payload.move_uci)
+    except ValueError as exc:
+        raise HTTPException(422, "Invalid UCI move") from exc
+    if submitted not in board.legal_moves:
+        raise HTTPException(422, "Move is not legal in this puzzle position")
 
     expected = puzzle.solution_uci.split()[0]
     correct = payload.move_uci == expected

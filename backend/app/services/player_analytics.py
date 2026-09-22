@@ -50,14 +50,14 @@ def _analysis_rows(db: Session, game_id: str, color: str, start_ply: int = 1, en
     return [(move, analysis) for move, analysis in db.execute(query).all() if _is_player_ply(move.ply, color)]
 
 
-def _score_for_result(result: str | None, color: str) -> float:
+def _score_for_result(result: str | None, color: str) -> float | None:
     if result == "1/2-1/2":
         return 0.5
     if result == "1-0":
         return 1.0 if color == "white" else 0.0
     if result == "0-1":
         return 1.0 if color == "black" else 0.0
-    return 0.0
+    return None
 
 
 def classify_endgame(fen: str) -> str | None:
@@ -114,12 +114,14 @@ def recompute_player_analytics(db: Session, user_id: str) -> None:
         opening_cpl = [a.centipawn_loss or 0 for _, a in opening_rows]
         first_error = next((m.ply for m, a in opening_rows if a.classification in ERROR_CLASSES), None)
         opening_key = (game.eco or "", game.opening or "Unknown opening", game.variation or "", color)
+        game_score = _score_for_result(game.result, color)
         opening_groups[opening_key].append({
             "accuracy": accuracy_from_cpl(opening_cpl),
-            "score": _score_for_result(game.result, color),
+            "score": game_score,
             "first_error": first_error,
         })
-        color_scores[color].append(_score_for_result(game.result, color))
+        if game_score is not None:
+            color_scores[color].append(game_score)
 
         entry = _endgame_entry(db, game.id)
         if entry:
@@ -135,10 +137,11 @@ def recompute_player_analytics(db: Session, user_id: str) -> None:
 
     opening_stats: list[OpeningStat] = []
     for (eco, opening, variation, color), samples in opening_groups.items():
-        scores = [float(sample["score"]) for sample in samples]
+        scores = [float(sample["score"]) for sample in samples if sample["score"] is not None]
         errors = [int(sample["first_error"]) for sample in samples if sample["first_error"] is not None]
         wins = sum(score == 1.0 for score in scores)
         draws = sum(score == 0.5 for score in scores)
+        losses = sum(score == 0.0 for score in scores)
         stat = OpeningStat(
             user_id=user_id,
             eco=eco or None,
@@ -148,7 +151,7 @@ def recompute_player_analytics(db: Session, user_id: str) -> None:
             games_count=len(samples),
             wins=wins,
             draws=draws,
-            losses=len(samples) - wins - draws,
+            losses=losses,
             avg_accuracy=round(sum(float(s["accuracy"]) for s in samples) / len(samples), 2),
             common_deviation_ply=round(median(errors)) if errors else None,
             updated_at=datetime.utcnow(),

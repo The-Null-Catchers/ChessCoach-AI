@@ -35,7 +35,7 @@ function cellsFromFen(fen: string): { cells: Cell[]; turn: "w" | "b" } {
   position.split("/").forEach((rank, rankIndex) => {
     let file = 0;
     for (const char of rank) {
-      if (/\\d/.test(char)) {
+      if (/[0-9]/.test(char)) {
         for (let i = 0; i < Number(char); i += 1) {
           cells.push({ piece: "", square: String.fromCharCode(97 + file) + String(8 - rankIndex) });
           file += 1;
