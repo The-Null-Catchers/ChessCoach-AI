@@ -34,6 +34,13 @@ type Mistake = {
   severity: number;
   confidence: number;
   explanation: string | null;
+  ai_coach: null | {
+    provider: string;
+    model: string;
+    skill_band: string;
+    explanation: string;
+    coaching_tip: string;
+  };
 };
 
 const PIECES: Record<string, string> = {
@@ -129,8 +136,12 @@ export default function GameReviewClient({ gameId }: { gameId: string }) {
           {relatedMistake && <div className="coach-note">
             <p className="eyebrow">COACHING NOTE</p>
             <h3>{relatedMistake.category.replaceAll("_", " ")}</h3>
-            <p>{relatedMistake.explanation}</p>
-            <small>Detector confidence {Math.round(relatedMistake.confidence * 100)}%</small>
+            <p>{relatedMistake.ai_coach?.explanation ?? relatedMistake.explanation}</p>
+            {relatedMistake.ai_coach && <p><b>Coach tip:</b> {relatedMistake.ai_coach.coaching_tip}</p>}
+            <small>
+              Detector confidence {Math.round(relatedMistake.confidence * 100)}%
+              {relatedMistake.ai_coach ? ` · ${relatedMistake.ai_coach.skill_band} explanation` : ""}
+            </small>
           </div>}
         </div>
         <div className="move-list">

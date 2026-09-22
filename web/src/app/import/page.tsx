@@ -7,6 +7,31 @@ type ImportResult = { count: number; games: Array<{ game_id: string; job_id?: st
 export default function ImportPage() {
   const [message, setMessage] = useState("");
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [progress, setProgress] = useState<number | null>(null);
+
+  async function watchJob(base: string, token: string, jobId: string) {
+    const response = await fetch(`${base}/analysis-jobs/${jobId}/events`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok || !response.body) return;
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() ?? "";
+      for (const event of events) {
+        const line = event.split("\n").find((item) => item.startsWith("data: "));
+        if (!line) continue;
+        const payload = JSON.parse(line.slice(6)) as { status: string; progress: number };
+        setProgress(payload.progress);
+        setMessage(`Analysis: ${payload.status.replaceAll("_", " ")} · ${payload.progress}%`);
+      }
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -36,7 +61,13 @@ export default function ImportPage() {
     }
     const data = await response.json() as ImportResult;
     setResult(data);
-    setMessage(`${data.count} game(s) accepted for analysis.`);
+    const activeJob = data.games.find((game) => !game.duplicate && game.job_id)?.job_id;
+    if (activeJob) {
+      setProgress(0);
+      void watchJob(base, token, activeJob);
+    } else {
+      setMessage(`${data.count} game(s) accepted; no new analysis was required.`);
+    }
   }
 
   return <main><div className="import-shell">
@@ -47,6 +78,7 @@ export default function ImportPage() {
       <button type="submit">Analyze PGN</button>
     </form>
     {message && <p>{message}</p>}
+    {progress !== null && <div className="progress-track" aria-label="Analysis progress"><span style={{ width: `${progress}%` }} /></div>}
     {result && <div className="panel">
       {result.games.map((game) => <div key={game.game_id} className="import-result">
         <span>{game.duplicate ? "Already imported" : "Queued for analysis"}</span>

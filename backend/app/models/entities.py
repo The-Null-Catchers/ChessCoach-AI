@@ -178,3 +178,68 @@ class AnalysisJob(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ReviewState(Base):
+    __tablename__ = 'review_states'
+    __table_args__ = (UniqueConstraint('user_id', 'puzzle_id', name='uq_user_puzzle_review'),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    puzzle_id: Mapped[str] = mapped_column(ForeignKey('puzzles.id', ondelete='CASCADE'), index=True)
+    repetitions: Mapped[int] = mapped_column(Integer, default=0)
+    interval_days: Mapped[int] = mapped_column(Integer, default=0)
+    ease_factor: Mapped[float] = mapped_column(Float, default=2.5)
+    lapses: Mapped[int] = mapped_column(Integer, default=0)
+    due_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class TrainingPlan(Base):
+    __tablename__ = 'training_plans'
+    __table_args__ = (UniqueConstraint('user_id', 'week_start', name='uq_user_training_week'),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    week_start: Mapped[datetime] = mapped_column(DateTime, index=True)
+    status: Mapped[str] = mapped_column(String(24), default='active')
+    focus_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class TrainingSession(Base):
+    __tablename__ = 'training_sessions'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    plan_id: Mapped[str] = mapped_column(ForeignKey('training_plans.id', ondelete='CASCADE'), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    session_type: Mapped[str] = mapped_column(String(40), index=True)
+    focus_category: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    target_count: Mapped[int] = mapped_column(Integer, default=10)
+    scheduled_for: Mapped[datetime] = mapped_column(DateTime, index=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    minutes_spent: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AIExplanation(Base):
+    __tablename__ = 'ai_explanations'
+    __table_args__ = (UniqueConstraint('move_id', 'prompt_version', 'skill_band', name='uq_move_ai_explanation'),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    move_id: Mapped[str] = mapped_column(ForeignKey('moves.id', ondelete='CASCADE'), index=True)
+    provider: Mapped[str] = mapped_column(String(32))
+    model: Mapped[str] = mapped_column(String(80))
+    prompt_version: Mapped[str] = mapped_column(String(32))
+    skill_band: Mapped[str] = mapped_column(String(24))
+    explanation: Mapped[str] = mapped_column(Text)
+    coaching_tip: Mapped[str] = mapped_column(Text)
+    structured_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class PlayerInsight(Base):
+    __tablename__ = 'player_insights'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    insight_type: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(180))
+    body: Mapped[str] = mapped_column(Text)
+    confidence: Mapped[float] = mapped_column(Float)
+    evidence_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

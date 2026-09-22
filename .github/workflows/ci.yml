@@ -3,6 +3,23 @@ on: [push, pull_request]
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: chesscoach
+          POSTGRES_USER: chesscoach
+          POSTGRES_PASSWORD: chesscoach
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chesscoach -d chesscoach"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://chesscoach:chesscoach@localhost:5432/chesscoach
+      JWT_SECRET: ci-only-secret
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -10,6 +27,11 @@ jobs:
       - run: pip install -r backend/requirements.txt
       - run: ruff check backend/app backend/tests
       - run: pytest backend/tests
+      - working-directory: backend
+        run: alembic upgrade head
+      - working-directory: backend
+        run: alembic current
+
   web:
     runs-on: ubuntu-latest
     defaults: {run: {working-directory: web}}
@@ -20,6 +42,7 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: npm run build
+
   flutter:
     runs-on: ubuntu-latest
     steps:
@@ -38,6 +61,7 @@ jobs:
         run: flutter build apk --debug
       - uses: actions/upload-artifact@v4
         with: {name: chesscoach-debug-apk, path: mobile/build/app/outputs/flutter-apk/app-debug.apk}
+
   docker:
     runs-on: ubuntu-latest
     steps:

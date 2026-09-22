@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.api.games import current_user_id
 from app.db.session import get_db
-from app.models.entities import Game, Mistake, PlayerWeakness, Puzzle, PuzzleAttempt
+from datetime import datetime
+from app.models.entities import AIExplanation, Game, Mistake, PlayerWeakness, Puzzle, PuzzleAttempt, ReviewState
+from app.services.spaced_repetition import schedule_review
 
 router = APIRouter(tags=["coaching"])
 
@@ -54,17 +56,29 @@ def game_mistakes(
     mistakes = db.scalars(
         select(Mistake).where(Mistake.game_id == game_id).order_by(Mistake.severity.desc())
     ).all()
-    return [
-        {
+    result = []
+    for m in mistakes:
+        ai = db.scalar(
+            select(AIExplanation)
+            .where(AIExplanation.move_id == m.move_id)
+            .order_by(AIExplanation.created_at.desc())
+        )
+        result.append({
             "id": m.id,
             "move_id": m.move_id,
             "category": m.category,
             "severity": m.severity,
             "confidence": m.confidence,
             "explanation": m.explanation,
-        }
-        for m in mistakes
-    ]
+            "ai_coach": None if ai is None else {
+                "provider": ai.provider,
+                "model": ai.model,
+                "skill_band": ai.skill_band,
+                "explanation": ai.explanation,
+                "coaching_tip": ai.coaching_tip,
+            },
+        })
+    return result
 
 
 @router.get("/puzzles")
@@ -104,18 +118,43 @@ def attempt_puzzle(
 
     expected = puzzle.solution_uci.split()[0]
     correct = payload.move_uci == expected
+    actual_grade = payload.grade if correct else "Again"
     attempt = PuzzleAttempt(
         user_id=user_id,
         puzzle_id=puzzle.id,
         correct=correct,
-        grade=payload.grade if correct else "Again",
+        grade=actual_grade,
         duration_seconds=payload.duration_seconds,
     )
     db.add(attempt)
+    review = db.scalar(select(ReviewState).where(
+        ReviewState.user_id == user_id,
+        ReviewState.puzzle_id == puzzle.id,
+    ))
+    if review is None:
+        review = ReviewState(user_id=user_id, puzzle_id=puzzle.id)
+        db.add(review)
+        db.flush()
+    scheduled = schedule_review(
+        actual_grade,
+        repetitions=review.repetitions,
+        interval_days=review.interval_days,
+        ease_factor=review.ease_factor,
+        lapses=review.lapses,
+        now=datetime.utcnow(),
+    )
+    review.repetitions = scheduled.repetitions
+    review.interval_days = scheduled.interval_days
+    review.ease_factor = scheduled.ease_factor
+    review.lapses = scheduled.lapses
+    review.due_at = scheduled.due_at
+    review.last_reviewed_at = datetime.utcnow()
     db.commit()
     return {
         "correct": correct,
         "expected_move": expected if not correct else None,
         "grade": attempt.grade,
         "theme": puzzle.theme,
+        "next_due_at": review.due_at.isoformat(),
+        "interval_days": review.interval_days,
     }
