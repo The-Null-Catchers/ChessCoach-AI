@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from app.db.session import SessionLocal
-from app.models.entities import AnalysisJob, EngineAnalysis, Game, Mistake, Move
+from app.models.entities import AnalysisJob, EngineAnalysis, Game, GamePlayer, Mistake, Move, Puzzle
 from app.services.classification import MoveContext, classify_move
 from app.services.coach_explanations import ensure_ai_explanation
 from app.services.engine_cache import analyze_cached
@@ -28,6 +28,26 @@ def analyze_game(self, game_id: str, job_id: str, depth: int = 16):
 
         moves = db.scalars(select(Move).where(Move.game_id == game_id).order_by(Move.ply)).all()
         total = max(1, len(moves))
+        player = db.scalar(select(GamePlayer).where(
+            GamePlayer.game_id == game.id,
+            GamePlayer.user_id == game.user_id,
+        ))
+        player_color = player.color if player else None
+        if player_color:
+            opponent_moves = [
+                move for move in moves
+                if not ((move.ply % 2 == 1 and player_color == "white") or (move.ply % 2 == 0 and player_color == "black"))
+            ]
+            opponent_ids = [move.id for move in opponent_moves]
+            if opponent_ids:
+                db.execute(delete(Mistake).where(Mistake.move_id.in_(opponent_ids)))
+                opponent_fens = [move.fen_before for move in opponent_moves]
+                db.execute(delete(Puzzle).where(
+                    Puzzle.user_id == game.user_id,
+                    Puzzle.source_game_id == game.id,
+                    Puzzle.fen.in_(opponent_fens),
+                ))
+            db.flush()
 
         for i, move in enumerate(moves):
             analysis = db.scalar(select(EngineAnalysis).where(EngineAnalysis.move_id == move.id))
@@ -59,8 +79,12 @@ def analyze_game(self, game_id: str, job_id: str, depth: int = 16):
                 db.add(analysis)
                 db.flush()
 
+            is_player_move = player_color is not None and (
+                (move.ply % 2 == 1 and player_color == "white")
+                or (move.ply % 2 == 0 and player_color == "black")
+            )
             existing_mistake = db.scalar(select(Mistake).where(Mistake.move_id == move.id))
-            if existing_mistake is None:
+            if is_player_move and existing_mistake is None:
                 semantic = detect_semantic_mistakes(
                     move.fen_before,
                     move.uci,
