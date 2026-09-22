@@ -292,7 +292,7 @@ class _ChessPositionBoardState extends State<ChessPositionBoard> {
                     final square = squares[index];
                     final file = square.codeUnitAt(0) - 'a'.codeUnitAt(0);
                     final rank = int.parse(square[1]);
-                    final isLight = (file + rank).isOdd;
+                    final isLight = (file + rank).isEven;
                     final piece = pieces[square];
                     final lastMove = widget.lastMoveUci;
                     final isLastMove = lastMove != null &&
@@ -393,34 +393,38 @@ class _ChessPositionBoardState extends State<ChessPositionBoard> {
                                       ),
                                     ),
                                   ),
-                                Positioned(
-                                  left: 2,
-                                  top: 1,
-                                  child: Text(
-                                    square[1],
-                                    style: TextStyle(
-                                      fontSize: math.max(8, squareSize * 0.13),
-                                      fontWeight: FontWeight.w700,
-                                      color: isLight
-                                          ? darkSquare
-                                          : lightSquare,
+                                if (index % 8 == 0)
+                                  Positioned(
+                                    left: 2,
+                                    top: 1,
+                                    child: Text(
+                                      square[1],
+                                      style: TextStyle(
+                                        fontSize:
+                                            math.max(8, squareSize * 0.13),
+                                        fontWeight: FontWeight.w700,
+                                        color: isLight
+                                            ? darkSquare
+                                            : lightSquare,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                Positioned(
-                                  right: 2,
-                                  bottom: 1,
-                                  child: Text(
-                                    square[0],
-                                    style: TextStyle(
-                                      fontSize: math.max(8, squareSize * 0.13),
-                                      fontWeight: FontWeight.w700,
-                                      color: isLight
-                                          ? darkSquare
-                                          : lightSquare,
+                                if (index ~/ 8 == 7)
+                                  Positioned(
+                                    right: 2,
+                                    bottom: 1,
+                                    child: Text(
+                                      square[0],
+                                      style: TextStyle(
+                                        fontSize:
+                                            math.max(8, squareSize * 0.13),
+                                        fontWeight: FontWeight.w700,
+                                        color: isLight
+                                            ? darkSquare
+                                            : lightSquare,
+                                      ),
                                     ),
                                   ),
-                                ),
                               ],
                             ),
                           ),
