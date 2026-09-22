@@ -41,7 +41,7 @@ class _GamesScreenState extends ConsumerState<GamesScreen> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const ListView(
+            return ListView(
               children: [
                 SizedBox(height: 260),
                 Center(child: CircularProgressIndicator()),
@@ -49,7 +49,7 @@ class _GamesScreenState extends ConsumerState<GamesScreen> {
             );
           }
           if (snapshot.hasError) {
-            return const ListView(
+            return ListView(
               padding: EdgeInsets.all(24),
               children: [
                 SizedBox(height: 120),
@@ -64,7 +64,7 @@ class _GamesScreenState extends ConsumerState<GamesScreen> {
           }
           final games = snapshot.data ?? const [];
           if (games.isEmpty) {
-            return const ListView(
+            return ListView(
               padding: EdgeInsets.all(24),
               children: [
                 SizedBox(height: 120),
