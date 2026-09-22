@@ -25,9 +25,9 @@ export default function ImportPage() {
     payload.set("pgn_text", pgn);
     const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
     setMessage("Importing games…");
-    const response = await fetch(\`\${base}/games/import\`, {
+    const response = await fetch(`${base}/games/import`, {
       method: "POST",
-      headers: { Authorization: \`Bearer \${token}\` },
+      headers: { Authorization: `Bearer ${token}` },
       body: payload,
     });
     if (!response.ok) {
@@ -36,7 +36,7 @@ export default function ImportPage() {
     }
     const data = await response.json() as ImportResult;
     setResult(data);
-    setMessage(\`\${data.count} game(s) accepted for analysis.\`);
+    setMessage(`${data.count} game(s) accepted for analysis.`);
   }
 
   return <main><div className="import-shell">
@@ -50,7 +50,7 @@ export default function ImportPage() {
     {result && <div className="panel">
       {result.games.map((game) => <div key={game.game_id} className="import-result">
         <span>{game.duplicate ? "Already imported" : "Queued for analysis"}</span>
-        <a href={\`/games/\${game.game_id}\`}>Open game</a>
+        <a href={`/games/${game.game_id}`}>Open game</a>
       </div>)}
     </div>}
   </div></main>;
