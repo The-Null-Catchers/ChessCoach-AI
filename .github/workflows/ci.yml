@@ -34,9 +34,9 @@ jobs:
         with: {python-version: '3.12'}
       - run: pip install -r backend/requirements.txt
       - run: ruff check backend/app backend/tests
-      - run: pytest backend/tests
       - working-directory: backend
         run: alembic upgrade head
+      - run: pytest backend/tests
       - working-directory: backend
         run: alembic current
 
