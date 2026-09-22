@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.games import current_user_id
 from app.db.session import get_db
 from datetime import datetime
-from app.models.entities import Game, Mistake, PlayerWeakness, Puzzle, PuzzleAttempt, ReviewState
+from app.models.entities import AIExplanation, Game, Mistake, PlayerWeakness, Puzzle, PuzzleAttempt, ReviewState
 from app.services.spaced_repetition import schedule_review
 
 router = APIRouter(tags=["coaching"])
@@ -56,17 +56,29 @@ def game_mistakes(
     mistakes = db.scalars(
         select(Mistake).where(Mistake.game_id == game_id).order_by(Mistake.severity.desc())
     ).all()
-    return [
-        {
+    result = []
+    for m in mistakes:
+        ai = db.scalar(
+            select(AIExplanation)
+            .where(AIExplanation.move_id == m.move_id)
+            .order_by(AIExplanation.created_at.desc())
+        )
+        result.append({
             "id": m.id,
             "move_id": m.move_id,
             "category": m.category,
             "severity": m.severity,
             "confidence": m.confidence,
             "explanation": m.explanation,
-        }
-        for m in mistakes
-    ]
+            "ai_coach": None if ai is None else {
+                "provider": ai.provider,
+                "model": ai.model,
+                "skill_band": ai.skill_band,
+                "explanation": ai.explanation,
+                "coaching_tip": ai.coaching_tip,
+            },
+        })
+    return result
 
 
 @router.get("/puzzles")
