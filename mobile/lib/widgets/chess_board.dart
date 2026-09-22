@@ -144,7 +144,7 @@ class _ChessPositionBoardState extends State<ChessPositionBoard> {
   bool _pieceCanMove(String square, String? piece) {
     if (!widget.enabled || _submitting || piece == null) return false;
     final sideToMove =
-        widget.fen.trim().split(RegExp(r'\s+')).elementAt(1) == 'w';
+        _game.fen.trim().split(RegExp(r'\s+')).elementAt(1) == 'w';
     return _isWhitePiece(piece) == sideToMove && _movesFrom(square).isNotEmpty;
   }
 
