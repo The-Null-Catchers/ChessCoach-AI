@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     max_pgn_bytes: int = 10 * 1024 * 1024
     analysis_default_depth: int = 16
     cors_origins: str = 'http://localhost:3000'
+    ai_provider: str = 'template'
+    ai_model: str = 'deterministic-v1'
+    ai_base_url: str = 'https://api.openai.com/v1'
+    ai_api_key: str = ''
 
 
 settings = Settings()
