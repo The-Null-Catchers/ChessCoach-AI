@@ -51,7 +51,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const ListView(
+            return ListView(
               children: [
                 SizedBox(height: 260),
                 Center(child: CircularProgressIndicator()),
@@ -59,7 +59,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
             );
           }
           if (snapshot.hasError || !snapshot.hasData) {
-            return const ListView(
+            return ListView(
               padding: EdgeInsets.all(24),
               children: [
                 SizedBox(height: 120),
