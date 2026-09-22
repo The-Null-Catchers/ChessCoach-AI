@@ -22,7 +22,7 @@ export default function GamesPage() {
       return;
     }
     const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
-    fetch(\`\${base}/games\`, { headers: { Authorization: \`Bearer \${token}\` } })
+    fetch(`${base}/games`, { headers: { Authorization: `Bearer ${token}` } })
       .then(async (response) => {
         if (!response.ok) throw new Error("Could not load games.");
         return (await response.json()) as Game[];
@@ -37,7 +37,7 @@ export default function GamesPage() {
   return <main><div className="review-shell">
     <p className="eyebrow">YOUR GAMES</p><h1>Game library</h1>
     {message && <p>{message}</p>}
-    <div className="game-list">{games.map((game) => <a className="game-row" href={\`/games/\${game.id}\`} key={game.id}>
+    <div className="game-list">{games.map((game) => <a className="game-row" href={`/games/${game.id}`} key={game.id}>
       <div><b>{game.white ?? "White"} vs {game.black ?? "Black"}</b><span>{game.opening ?? "Opening not identified"}</span></div>
       <div><strong>{game.result ?? "*"}</strong><small>{game.analyzed ? "Analyzed" : "Queued"}</small></div>
     </a>)}</div>
