@@ -9,6 +9,7 @@ from app.services.coach_explanations import ensure_ai_explanation
 from app.services.engine_cache import analyze_cached
 from app.services.semantic_mistakes import detect_semantic_mistakes
 from app.services.player_analytics import recompute_player_analytics
+from app.services.mistake_taxonomy import attach_semantic_categories, ensure_primary_link
 from app.services.training import create_puzzle_from_mistake, recompute_weaknesses
 from app.tasks.celery_app import celery
 
@@ -106,6 +107,7 @@ def analyze_game(self, game_id: str, job_id: str, depth: int = 16):
                     )
                     db.add(existing_mistake)
                     db.flush()
+                    attach_semantic_categories(db, existing_mistake, semantic)
                     create_puzzle_from_mistake(
                         db,
                         game.user_id,
@@ -114,6 +116,9 @@ def analyze_game(self, game_id: str, job_id: str, depth: int = 16):
                         analysis,
                         primary.category,
                     )
+
+            if is_player_move and existing_mistake is not None:
+                ensure_primary_link(db, existing_mistake)
 
             job.progress = 5 + int((i + 1) / total * 82)
             db.commit()
