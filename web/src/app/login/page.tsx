@@ -15,7 +15,7 @@ export default function LoginPage() {
     };
     if (mode === "register") body.display_name = String(form.get("display_name") ?? "");
     const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
-    const response = await fetch(\`\${base}/auth/\${mode === "login" ? "login" : "register"}\`, {
+    const response = await fetch(`${base}/auth/${mode === "login" ? "login" : "register"}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
