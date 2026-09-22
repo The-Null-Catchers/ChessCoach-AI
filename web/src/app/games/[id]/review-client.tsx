@@ -12,6 +12,7 @@ type Analysis = {
 };
 
 type ReviewedMove = {
+  move_id: string;
   ply: number;
   san: string;
   uci: string;
@@ -99,7 +100,7 @@ export default function GameReviewClient({ gameId }: { gameId: string }) {
   );
   const squares = fenSquares(move?.fen_after ?? game?.moves[0]?.fen_before ?? "8/8/8/8/8/8/8/8 w - - 0 1");
   const relatedMistake = move?.analysis && ["inaccuracy", "mistake", "blunder"].includes(move.analysis.classification)
-    ? mistakes.find((item) => item.category.length > 0) ?? null
+    ? mistakes.find((item) => item.move_id === move.move_id) ?? null
     : null;
 
   if (error) return <main><div className="review-shell"><h1>Game review</h1><p>{error}</p></div></main>;
