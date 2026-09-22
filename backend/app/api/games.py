@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.entities import Game, Move, AnalysisJob, EngineAnalysis
+from app.services.player_identity import link_game_players
 from app.services.pgn import parse_pgn_many
 from app.tasks.analysis import analyze_game
 
@@ -23,6 +24,7 @@ def current_user_id(authorization: str = Header(...)) -> str:
 
 @router.post('/import', status_code=202)
 async def import_games(pgn_text: str | None = Form(default=None), file: UploadFile | None = File(default=None),
+                       player_name: str | None = Form(default=None),
                        user_id: str = Depends(current_user_id), db: Session = Depends(get_db)):
     if not pgn_text and not file:
         raise HTTPException(400, 'Provide PGN text or file')
@@ -36,14 +38,21 @@ async def import_games(pgn_text: str | None = Form(default=None), file: UploadFi
     for item in parsed:
         existing = db.scalar(select(Game).where(Game.user_id == user_id, Game.fingerprint == item.fingerprint))
         if existing:
+            link_game_players(db, game=existing, user_id=user_id, explicit_name=player_name,
+                              white_rating=item.headers.get('WhiteElo'), black_rating=item.headers.get('BlackElo'))
+            db.commit()
             imported.append({'game_id': existing.id, 'duplicate': True}); continue
         h = item.headers
         game = Game(user_id=user_id, fingerprint=item.fingerprint, pgn=item.pgn,
                     event=h.get('Event'), site=h.get('Site'), white_name=h.get('White'), black_name=h.get('Black'),
-                    result=h.get('Result'), eco=h.get('ECO'), opening=h.get('Opening'), played_at=item.played_at)
+                    result=h.get('Result'), eco=h.get('ECO'), opening=h.get('Opening'), variation=h.get('Variation'),
+                    time_control=h.get('TimeControl'), played_at=item.played_at)
         db.add(game); db.flush()
+        link_game_players(db, game=game, user_id=user_id, explicit_name=player_name,
+                          white_rating=h.get('WhiteElo'), black_rating=h.get('BlackElo'))
         for m in item.moves:
-            db.add(Move(game_id=game.id, ply=m.ply, san=m.san, uci=m.uci, fen_before=m.fen_before, fen_after=m.fen_after))
+            db.add(Move(game_id=game.id, ply=m.ply, san=m.san, uci=m.uci, fen_before=m.fen_before,
+                        fen_after=m.fen_after, clock_seconds=m.clock_seconds))
         job = AnalysisJob(user_id=user_id, game_id=game.id, status='queued', progress=0)
         db.add(job); db.commit()
         analyze_game.delay(game.id, job.id)
