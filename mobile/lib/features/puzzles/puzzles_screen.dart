@@ -108,7 +108,7 @@ class _PuzzlesScreenState extends ConsumerState<PuzzlesScreen> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const ListView(
+            return ListView(
               children: [
                 SizedBox(height: 260),
                 Center(child: CircularProgressIndicator()),
@@ -116,7 +116,7 @@ class _PuzzlesScreenState extends ConsumerState<PuzzlesScreen> {
             );
           }
           if (snapshot.hasError) {
-            return const ListView(
+            return ListView(
               padding: EdgeInsets.all(24),
               children: [
                 SizedBox(height: 120),
@@ -129,7 +129,7 @@ class _PuzzlesScreenState extends ConsumerState<PuzzlesScreen> {
           }
           final puzzles = snapshot.data ?? const [];
           if (puzzles.isEmpty) {
-            return const ListView(
+            return ListView(
               padding: EdgeInsets.all(24),
               children: [
                 SizedBox(height: 120),
@@ -185,7 +185,7 @@ class _PuzzlesScreenState extends ConsumerState<PuzzlesScreen> {
                   labelText: 'Your move (UCI)',
                   hintText: 'e2e4',
                   helperText:
-                      'Board interaction is the next mobile milestone; this uses the real puzzle API now.',
+                      'Enter moves in UCI format, for example e2e4.',
                 ),
               ),
               const SizedBox(height: 12),
