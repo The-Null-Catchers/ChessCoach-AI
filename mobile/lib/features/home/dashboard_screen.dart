@@ -64,7 +64,7 @@ class _CoachDashboardState extends ConsumerState<CoachDashboard> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const ListView(
+            return ListView(
               children: [
                 SizedBox(height: 260),
                 Center(child: CircularProgressIndicator()),
