@@ -59,7 +59,7 @@ function fenSquares(fen: string): string[] {
 function evaluationLabel(cp: number | null): string {
   if (cp === null) return "—";
   const pawns = cp / 100;
-  return \`\${pawns >= 0 ? "+" : ""}\${pawns.toFixed(2)}\`;
+  return `${pawns >= 0 ? "+" : ""}${pawns.toFixed(2)}`;
 }
 
 export default function GameReviewClient({ gameId }: { gameId: string }) {
@@ -75,10 +75,10 @@ export default function GameReviewClient({ gameId }: { gameId: string }) {
       return;
     }
     const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
-    const headers = { Authorization: \`Bearer \${token}\` };
+    const headers = { Authorization: `Bearer ${token}` };
     Promise.all([
-      fetch(\`\${base}/games/\${gameId}/analysis\`, { headers }),
-      fetch(\`\${base}/games/\${gameId}/mistakes\`, { headers }),
+      fetch(`${base}/games/${gameId}/analysis`, { headers }),
+      fetch(`${base}/games/${gameId}/mistakes`, { headers }),
     ])
       .then(async ([analysisResponse, mistakesResponse]) => {
         if (!analysisResponse.ok || !mistakesResponse.ok) throw new Error("Could not load this game review.");
@@ -118,11 +118,11 @@ export default function GameReviewClient({ gameId }: { gameId: string }) {
       <div className="review-side">
         <div className="panel">
           <div className="move-heading">
-            <div><small>Selected move</small><h2>{move ? \`\${move.ply}. \${move.san}\` : "Starting position"}</h2></div>
+            <div><small>Selected move</small><h2>{move ? `${move.ply}. ${move.san}` : "Starting position"}</h2></div>
             <strong>{evaluationLabel(move?.analysis?.after_cp ?? null)}</strong>
           </div>
           {move?.analysis && <div className="analysis-facts">
-            <span className={\`classification \${move.analysis.classification}\`}>{move.analysis.classification}</span>
+            <span className={`classification ${move.analysis.classification}`}>{move.analysis.classification}</span>
             <p><b>Best move:</b> {move.analysis.best_move ?? "—"}</p>
             <p><b>Centipawn loss:</b> {move.analysis.cpl ?? "—"}</p>
           </div>}
