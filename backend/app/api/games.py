@@ -1,16 +1,21 @@
 from __future__ import annotations
 import jwt
+from typing import Literal
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import get_db
-from app.models.entities import Game, Move, AnalysisJob, EngineAnalysis
+from app.models.entities import Game, GamePlayer, Move, AnalysisJob, EngineAnalysis
 from app.services.player_identity import link_game_players
 from app.services.pgn import parse_pgn_many
 from app.tasks.analysis import analyze_game
 
 router = APIRouter(prefix='/games', tags=['games'])
+
+class IdentifyPlayerRequest(BaseModel):
+    color: Literal["white", "black"]
 
 def current_user_id(authorization: str = Header(...)) -> str:
     try:
@@ -62,7 +67,22 @@ async def import_games(pgn_text: str | None = Form(default=None), file: UploadFi
 @router.get('')
 def list_games(user_id: str = Depends(current_user_id), db: Session = Depends(get_db), limit: int = 20, offset: int = 0):
     rows = db.scalars(select(Game).where(Game.user_id == user_id).order_by(Game.created_at.desc()).offset(offset).limit(min(limit, 100))).all()
-    return [{'id': g.id, 'white': g.white_name, 'black': g.black_name, 'result': g.result, 'eco': g.eco, 'opening': g.opening, 'analyzed': g.analyzed} for g in rows]
+    result = []
+    for g in rows:
+        player = db.scalar(select(GamePlayer).where(GamePlayer.game_id == g.id, GamePlayer.user_id == user_id))
+        result.append({
+            'id': g.id,
+            'white': g.white_name,
+            'black': g.black_name,
+            'result': g.result,
+            'eco': g.eco,
+            'opening': g.opening,
+            'variation': g.variation,
+            'time_control': g.time_control,
+            'analyzed': g.analyzed,
+            'player_color': player.color if player else None,
+        })
+    return result
 
 @router.get('/{game_id}/analysis')
 def game_analysis(game_id: str, user_id: str = Depends(current_user_id), db: Session = Depends(get_db)):
@@ -76,3 +96,35 @@ def game_analysis(game_id: str, user_id: str = Depends(current_user_id), db: Ses
                     'analysis': None if not a else {'before_cp': a.eval_before_cp, 'after_cp': a.eval_after_cp,
                     'cpl': a.centipawn_loss, 'classification': a.classification, 'best_move': a.best_move_uci, 'pv': a.pv_uci}})
     return {'game_id': game.id, 'analyzed': game.analyzed, 'moves': out}
+
+
+@router.post('/{game_id}/player', status_code=202)
+def identify_player(
+    game_id: str,
+    payload: IdentifyPlayerRequest,
+    user_id: str = Depends(current_user_id),
+    db: Session = Depends(get_db),
+):
+    game = db.scalar(select(Game).where(Game.id == game_id, Game.user_id == user_id))
+    if not game:
+        raise HTTPException(404, 'Game not found')
+
+    players = {
+        player.color: player
+        for player in db.scalars(select(GamePlayer).where(GamePlayer.game_id == game.id)).all()
+    }
+    for color, name in [('white', game.white_name), ('black', game.black_name)]:
+        if color not in players:
+            players[color] = GamePlayer(game_id=game.id, color=color, name=name)
+            db.add(players[color])
+    selected = players[payload.color]
+    selected.user_id = user_id
+    other_color = 'black' if payload.color == 'white' else 'white'
+    if players[other_color].user_id == user_id:
+        players[other_color].user_id = None
+
+    job = AnalysisJob(user_id=user_id, game_id=game.id, status='queued', progress=0)
+    db.add(job)
+    db.commit()
+    analyze_game.delay(game.id, job.id)
+    return {'game_id': game.id, 'player_color': payload.color, 'job_id': job.id}
