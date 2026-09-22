@@ -304,7 +304,7 @@ class _ChessPositionBoardState extends State<ChessPositionBoard> {
                     final canDrag = _pieceCanMove(square, piece);
 
                     final pieceWidget = Semantics(
-                      label: piece == null ? square : square + ' ' + piece,
+                      label: piece == null ? square : '$square $piece',
                       child: Center(
                         child: Text(
                           piece == null ? '' : _pieceGlyph(piece),
