@@ -12,6 +12,7 @@ class ParsedMove:
     uci: str
     fen_before: str
     fen_after: str
+    clock_seconds: float | None = None
 
 @dataclass
 class ParsedGame:
@@ -50,8 +51,9 @@ def parse_pgn_many(text: str) -> list[ParsedGame]:
             before = board.fen()
             san = board.san(move)
             uci = move.uci()
+            clock_seconds = node.clock()
             board.push(move)
-            moves.append(ParsedMove(ply, san, uci, before, board.fen()))
+            moves.append(ParsedMove(ply, san, uci, before, board.fen(), clock_seconds))
         exporter = chess.pgn.StringExporter(headers=True, variations=False, comments=True)
         rendered = game.accept(exporter)
         played_at = None

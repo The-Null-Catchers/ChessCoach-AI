@@ -70,10 +70,55 @@ class Game(Base):
     result: Mapped[str | None] = mapped_column(String(16), nullable=True)
     eco: Mapped[str | None] = mapped_column(String(8), nullable=True)
     opening: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    variation: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    time_control: Mapped[str | None] = mapped_column(String(64), nullable=True)
     played_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     analyzed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     moves = relationship('Move', back_populates='game', cascade='all, delete-orphan')
+
+
+class GamePlayer(Base):
+    __tablename__ = 'game_players'
+    __table_args__ = (UniqueConstraint('game_id', 'color', name='uq_game_player_color'),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    game_id: Mapped[str] = mapped_column(ForeignKey('games.id', ondelete='CASCADE'), index=True)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
+    color: Mapped[str] = mapped_column(String(5))
+    name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class OpeningStat(Base):
+    __tablename__ = 'opening_stats'
+    __table_args__ = (
+        UniqueConstraint('user_id', 'eco', 'opening', 'variation', 'color', name='uq_user_opening_stat'),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    eco: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    opening: Mapped[str] = mapped_column(String(255))
+    variation: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    color: Mapped[str] = mapped_column(String(5))
+    games_count: Mapped[int] = mapped_column(Integer, default=0)
+    wins: Mapped[int] = mapped_column(Integer, default=0)
+    draws: Mapped[int] = mapped_column(Integer, default=0)
+    losses: Mapped[int] = mapped_column(Integer, default=0)
+    avg_accuracy: Mapped[float] = mapped_column(Float, default=0)
+    common_deviation_ply: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class EndgameStat(Base):
+    __tablename__ = 'endgame_stats'
+    __table_args__ = (UniqueConstraint('user_id', 'category', name='uq_user_endgame_stat'),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    category: Mapped[str] = mapped_column(String(64))
+    games_count: Mapped[int] = mapped_column(Integer, default=0)
+    avg_accuracy: Mapped[float] = mapped_column(Float, default=0)
+    mistakes: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class Move(Base):
@@ -129,6 +174,24 @@ class Mistake(Base):
     severity: Mapped[float] = mapped_column(Float)
     confidence: Mapped[float] = mapped_column(Float, default=0.5)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evidence_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class MistakeCategory(Base):
+    __tablename__ = 'mistake_categories'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    slug: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(120))
+    group: Mapped[str] = mapped_column(String(40), index=True)
+
+
+class MistakeCategoryLink(Base):
+    __tablename__ = 'mistake_category_links'
+    __table_args__ = (UniqueConstraint('mistake_id', 'category_id', name='uq_mistake_category_link'),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    mistake_id: Mapped[str] = mapped_column(ForeignKey('mistakes.id', ondelete='CASCADE'), index=True)
+    category_id: Mapped[str] = mapped_column(ForeignKey('mistake_categories.id', ondelete='CASCADE'), index=True)
+    confidence: Mapped[float] = mapped_column(Float)
     evidence_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 

@@ -64,6 +64,25 @@ def _early_queen_move(before: chess.Board, move: chess.Move) -> bool:
     return before.fullmove_number <= 6
 
 
+
+def _fork_targets(board: chess.Board, square: chess.Square, attacker_color: chess.Color) -> list[chess.Square]:
+    targets: list[chess.Square] = []
+    for target in board.attacks(square):
+        piece = board.piece_at(target)
+        if piece and piece.color != attacker_color and PIECE_VALUES[piece.piece_type] >= 3:
+            targets.append(target)
+    return targets
+
+
+def _pinned_squares(board: chess.Board, color: chess.Color) -> set[chess.Square]:
+    return {
+        square
+        for square, piece in board.piece_map().items()
+        if piece.color == color
+        and piece.piece_type != chess.KING
+        and board.is_pinned(color, square)
+    }
+
 def detect_semantic_mistakes(
     fen_before: str,
     played_uci: str,
@@ -112,6 +131,36 @@ def detect_semantic_mistakes(
     if best_move_uci:
         best = chess.Move.from_uci(best_move_uci)
         if best in before.legal_moves:
+            board_best = before.copy(stack=False)
+            board_best.push(best)
+            best_piece = board_best.piece_at(best.to_square)
+            if best_piece and (centipawn_loss or 0) >= 100:
+                targets = _fork_targets(board_best, best.to_square, mover)
+                if len(targets) >= 2:
+                    mistakes.append(SemanticMistake(
+                        category="missed_fork",
+                        confidence=0.91,
+                        explanation="The best move creates a fork, attacking multiple valuable targets at once.",
+                        evidence={
+                            "best_move": best_move_uci,
+                            "targets": [chess.square_name(square) for square in targets],
+                        },
+                    ))
+
+            pins_before = _pinned_squares(before, not mover)
+            pins_after = _pinned_squares(board_best, not mover)
+            new_pins = pins_after - pins_before
+            if new_pins and (centipawn_loss or 0) >= 100:
+                mistakes.append(SemanticMistake(
+                    category="missed_pin",
+                    confidence=0.88,
+                    explanation="The best move creates an absolute pin to the king, restricting an enemy piece.",
+                    evidence={
+                        "best_move": best_move_uci,
+                        "pinned_squares": [chess.square_name(square) for square in new_pins],
+                    },
+                ))
+
             if before.is_capture(best) and not before.is_capture(move) and (centipawn_loss or 0) >= 120:
                 mistakes.append(SemanticMistake(
                     category="missed_forcing_move",
@@ -119,8 +168,6 @@ def detect_semantic_mistakes(
                     explanation="A forcing capture was available, but the played move missed the tactical opportunity.",
                     evidence={"played": played_uci, "best_move": best_move_uci},
                 ))
-            board_best = before.copy(stack=False)
-            board_best.push(best)
             if board_best.is_check() and not after.is_check() and (centipawn_loss or 0) >= 120:
                 mistakes.append(SemanticMistake(
                     category="missed_check",
