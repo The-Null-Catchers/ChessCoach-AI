@@ -29,7 +29,7 @@ export default function TrainingPage() {
       return;
     }
     const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
-    const response = await fetch(\`\${base}/training\`, { headers: { Authorization: \`Bearer \${token}\` } });
+    const response = await fetch(`${base}/training`, { headers: { Authorization: `Bearer ${token}` } });
     if (!response.ok) {
       setMessage("Could not load your training plan.");
       return;
@@ -44,9 +44,9 @@ export default function TrainingPage() {
   async function complete(sessionId: string) {
     const token = window.localStorage.getItem("chesscoach_access_token");
     const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
-    await fetch(\`\${base}/training/\${sessionId}/complete\`, {
+    await fetch(`${base}/training/${sessionId}/complete`, {
       method: "POST",
-      headers: { Authorization: \`Bearer \${token}\`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ minutes_spent: 15 }),
     });
     await load();
