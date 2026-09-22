@@ -14,6 +14,8 @@ from app.models.entities import (
     AIExplanation,
     Game,
     Mistake,
+    MistakeCategory,
+    MistakeCategoryLink,
     PlayerWeakness,
     Puzzle,
     PuzzleAttempt,
@@ -111,12 +113,22 @@ def game_mistakes(
             .where(AIExplanation.move_id == mistake.move_id)
             .order_by(AIExplanation.created_at.desc())
         )
+        categories = db.execute(
+            select(MistakeCategory.slug, MistakeCategory.title, MistakeCategory.group, MistakeCategoryLink.confidence)
+            .join(MistakeCategoryLink, MistakeCategoryLink.category_id == MistakeCategory.id)
+            .where(MistakeCategoryLink.mistake_id == mistake.id)
+            .order_by(MistakeCategoryLink.confidence.desc())
+        ).all()
         result.append({
             "id": mistake.id,
             "move_id": mistake.move_id,
             "category": mistake.category,
             "severity": mistake.severity,
             "confidence": mistake.confidence,
+            "categories": [
+                {"slug": slug, "title": title, "group": group, "confidence": confidence}
+                for slug, title, group, confidence in categories
+            ],
             "explanation": mistake.explanation,
             "ai_coach": None if ai is None else {
                 "provider": ai.provider,
