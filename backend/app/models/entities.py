@@ -177,6 +177,24 @@ class Mistake(Base):
     evidence_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class MistakeCategory(Base):
+    __tablename__ = 'mistake_categories'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    slug: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(120))
+    group: Mapped[str] = mapped_column(String(40), index=True)
+
+
+class MistakeCategoryLink(Base):
+    __tablename__ = 'mistake_category_links'
+    __table_args__ = (UniqueConstraint('mistake_id', 'category_id', name='uq_mistake_category_link'),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    mistake_id: Mapped[str] = mapped_column(ForeignKey('mistakes.id', ondelete='CASCADE'), index=True)
+    category_id: Mapped[str] = mapped_column(ForeignKey('mistake_categories.id', ondelete='CASCADE'), index=True)
+    confidence: Mapped[float] = mapped_column(Float)
+    evidence_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class PlayerWeakness(Base):
     __tablename__ = 'player_weaknesses'
     __table_args__ = (UniqueConstraint('user_id', 'category', name='uq_user_weakness'),)
