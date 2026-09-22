@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.games import current_user_id
 from app.db.session import get_db
 from app.models.entities import EndgameStat, OpeningStat, PlayerInsight, PlayerWeakness, Profile
-from app.services.player_analytics import compute_overview, recompute_player_analytics
+from app.services.player_analytics import compute_overview
 
 router = APIRouter(tags=["analytics"])
 
@@ -17,8 +17,6 @@ def analytics(
     user_id: str = Depends(current_user_id),
     db: Session = Depends(get_db),
 ):
-    recompute_player_analytics(db, user_id)
-    db.commit()
     profile = db.scalar(select(Profile).where(Profile.user_id == user_id))
     openings = db.scalars(
         select(OpeningStat)
@@ -98,8 +96,6 @@ def openings(
     user_id: str = Depends(current_user_id),
     db: Session = Depends(get_db),
 ):
-    recompute_player_analytics(db, user_id)
-    db.commit()
     rows = db.scalars(
         select(OpeningStat).where(OpeningStat.user_id == user_id).order_by(OpeningStat.games_count.desc())
     ).all()
@@ -125,8 +121,6 @@ def endgames(
     user_id: str = Depends(current_user_id),
     db: Session = Depends(get_db),
 ):
-    recompute_player_analytics(db, user_id)
-    db.commit()
     rows = db.scalars(
         select(EndgameStat).where(EndgameStat.user_id == user_id).order_by(EndgameStat.games_count.desc())
     ).all()
@@ -146,8 +140,6 @@ def insights(
     user_id: str = Depends(current_user_id),
     db: Session = Depends(get_db),
 ):
-    recompute_player_analytics(db, user_id)
-    db.commit()
     rows = db.scalars(
         select(PlayerInsight)
         .where(PlayerInsight.user_id == user_id)
