@@ -235,3 +235,47 @@ def recompute_player_analytics(db: Session, user_id: str) -> None:
             ))
 
     db.flush()
+
+
+def compute_overview(db: Session, user_id: str) -> dict[str, object]:
+    linked = db.execute(
+        select(Game, GamePlayer)
+        .join(GamePlayer, GamePlayer.game_id == Game.id)
+        .where(GamePlayer.user_id == user_id, Game.analyzed.is_(True))
+    ).all()
+
+    all_cpl: list[int] = []
+    phase_cpl: dict[str, list[int]] = {"opening": [], "middlegame": [], "endgame": []}
+    blunders = 0
+    mistakes = 0
+    games = len(linked)
+
+    for game, player in linked:
+        endgame = _endgame_entry(db, game.id)
+        endgame_start = endgame[1] if endgame else None
+        rows = _analysis_rows(db, game.id, player.color)
+        for move, analysis in rows:
+            cpl = analysis.centipawn_loss or 0
+            all_cpl.append(cpl)
+            if analysis.classification == "blunder":
+                blunders += 1
+            if analysis.classification in {"mistake", "blunder"}:
+                mistakes += 1
+            if move.ply <= 20:
+                phase_cpl["opening"].append(cpl)
+            elif endgame_start is not None and move.ply >= endgame_start:
+                phase_cpl["endgame"].append(cpl)
+            else:
+                phase_cpl["middlegame"].append(cpl)
+
+    return {
+        "games_analyzed": games,
+        "average_centipawn_loss": round(sum(all_cpl) / len(all_cpl), 2) if all_cpl else None,
+        "blunders_per_game": round(blunders / games, 2) if games else 0.0,
+        "mistakes_per_game": round(mistakes / games, 2) if games else 0.0,
+        "accuracy": accuracy_from_cpl(all_cpl) if all_cpl else None,
+        "phase_accuracy": {
+            phase: accuracy_from_cpl(values) if values else None
+            for phase, values in phase_cpl.items()
+        },
+    }
