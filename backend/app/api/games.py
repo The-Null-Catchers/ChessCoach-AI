@@ -63,7 +63,7 @@ def game_analysis(game_id: str, user_id: str = Depends(current_user_id), db: Ses
     out = []
     for m in moves:
         a = db.scalar(select(EngineAnalysis).where(EngineAnalysis.move_id == m.id))
-        out.append({'ply': m.ply, 'san': m.san, 'uci': m.uci, 'fen_before': m.fen_before, 'fen_after': m.fen_after,
+        out.append({'move_id': m.id, 'ply': m.ply, 'san': m.san, 'uci': m.uci, 'fen_before': m.fen_before, 'fen_after': m.fen_after,
                     'analysis': None if not a else {'before_cp': a.eval_before_cp, 'after_cp': a.eval_after_cp,
                     'cpl': a.centipawn_loss, 'classification': a.classification, 'best_move': a.best_move_uci, 'pv': a.pv_uci}})
     return {'game_id': game.id, 'analyzed': game.analyzed, 'moves': out}
