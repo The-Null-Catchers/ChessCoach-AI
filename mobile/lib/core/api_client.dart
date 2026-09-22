@@ -249,7 +249,8 @@ class ApiClient implements ChessCoachApi {
 
     final remaining = <Map<String, dynamic>>[];
     var synced = 0;
-    for (final item in pending) {
+    for (var index = 0; index < pending.length; index += 1) {
+      final item = pending[index];
       final puzzleId = item['puzzle_id'] as String;
       final payload = Map<String, dynamic>.from(item)
         ..remove('local_id')
@@ -259,8 +260,7 @@ class ApiClient implements ChessCoachApi {
         synced += 1;
       } on DioException catch (error) {
         if (_isConnectivityFailure(error)) {
-          remaining.add(item);
-          remaining.addAll(pending.skip(synced + remaining.length));
+          remaining.addAll(pending.skip(index));
           break;
         }
         // Server-rejected attempts are dropped rather than retried forever.
