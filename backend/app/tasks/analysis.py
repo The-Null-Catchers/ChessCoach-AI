@@ -8,6 +8,7 @@ from app.services.classification import MoveContext, classify_move
 from app.services.coach_explanations import ensure_ai_explanation
 from app.services.engine_cache import analyze_cached
 from app.services.semantic_mistakes import detect_semantic_mistakes
+from app.services.player_analytics import recompute_player_analytics
 from app.services.training import create_puzzle_from_mistake, recompute_weaknesses
 from app.tasks.celery_app import celery
 
@@ -118,9 +119,11 @@ def analyze_game(self, game_id: str, job_id: str, depth: int = 16):
         job.status = "insights"
         job.progress = 94
         recompute_weaknesses(db, game.user_id)
+        game.analyzed = True
+        db.flush()
+        recompute_player_analytics(db, game.user_id)
         db.commit()
 
-        game.analyzed = True
         job.status = "complete"
         job.progress = 100
         db.commit()
