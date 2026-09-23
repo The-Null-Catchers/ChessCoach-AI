@@ -1,7 +1,7 @@
 from celery import Celery
 from app.core.config import settings
 
-celery = Celery('chesscoach', broker=settings.redis_url, backend=settings.redis_url)
+celery = Celery(\n    'chesscoach',\n    broker=settings.redis_url,\n    backend=settings.redis_url,\n    include=['app.tasks.analysis', 'app.tasks.email'],\n)
 celery.conf.task_track_started = True
 celery.conf.task_acks_late = True
 celery.conf.worker_prefetch_multiplier = 1
