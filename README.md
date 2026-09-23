@@ -8,6 +8,8 @@ The repository now includes the core end-to-end coaching loop rather than a UI-o
 
 - FastAPI + PostgreSQL backend with Argon2 password hashing and JWT access tokens
 - persisted refresh-token families with rotation, replay detection, logout and logout-all
+- one-time email verification and password-reset flows with hashed expiring tokens
+- Redis-backed abuse rate limiting for sensitive authentication endpoints
 - multi-game PGN parsing, duplicate detection, player-side identification and clock extraction
 - asynchronous Stockfish analysis through Celery + Redis
 - normalized position hashing and cached engine analysis
@@ -63,8 +65,7 @@ Register → import PGN → analysis worker processes the game → inspect criti
 
 ## Near-term roadmap
 
-- production rate limiting and abuse controls
-- email verification and password reset flows
+- admin/operations abuse controls beyond auth rate limiting
 - opening repertoire move-tree trainer
 - dedicated endgame training modules
 - weekly report generation and notifications
