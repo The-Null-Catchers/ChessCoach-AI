@@ -19,6 +19,16 @@ class Settings(BaseSettings):
     ai_model: str = 'deterministic-v1'
     ai_base_url: str = 'https://api.openai.com/v1'
     ai_api_key: str = ''
+    auth_action_token_minutes: int = 30
+    rate_limit_enabled: bool = True
+    rate_limit_fail_open: bool = True
+    frontend_url: str = 'http://localhost:3000'
+    smtp_host: str = ''
+    smtp_port: int = 587
+    smtp_username: str = ''
+    smtp_password: str = ''
+    smtp_from_email: str = 'noreply@chesscoach.local'
+    smtp_starttls: bool = True
 
 
 settings = Settings()
