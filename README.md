@@ -1,27 +1,39 @@
 # ChessCoach AI
 
-A production-oriented intelligent chess training platform that learns from a player's real games. Stockfish supplies objective analysis; higher-level classifiers and AI coaching turn critical moments into personalized training.
+ChessCoach AI is a production-oriented intelligent chess training platform that learns from a player's real games. Stockfish supplies objective chess analysis; deterministic classifiers, statistics, spaced repetition and an AI coaching layer turn critical moments into personalized training.
 
-## What is implemented in Phase 1
+## Current implementation
 
-- FastAPI service with Argon2 password hashing and JWT auth
-- PostgreSQL domain model for users, games, moves, analyses, mistakes, weaknesses and puzzles
-- multi-game PGN parsing and per-user duplicate detection
-- FEN/PGN persistence and normalized position hashing foundation
+The repository now includes the core end-to-end coaching loop rather than a UI-only prototype:
+
+- FastAPI + PostgreSQL backend with Argon2 password hashing and JWT access tokens
+- persisted refresh-token families with rotation, replay detection, logout and logout-all
+- multi-game PGN parsing, duplicate detection, player-side identification and clock extraction
 - asynchronous Stockfish analysis through Celery + Redis
-- context-aware move classification (not a raw fixed-CPL wrapper)
-- analysis-job progress endpoint
-- Next.js responsive coaching dashboard foundation
-- Flutter/Riverpod mobile foundation with original chess-product visual language
+- normalized position hashing and cached engine analysis
+- context-aware move classification with mate-aware handling
+- semantic mistake detection, normalized mistake taxonomy and player-only weakness aggregation
+- deterministic tactical motif detection for hanging pieces, forks and absolute pins
+- time-management themes when clock data is available
+- structured AI coaching with provider abstraction and deterministic fallback
+- SSE analysis progress
+- user-game puzzle generation and spaced repetition (Again / Hard / Good / Easy)
+- adaptive weekly training plans and session tracking
+- analytics for phase accuracy, openings, endgames, weaknesses and evidence-based insights
+- Next.js dashboard, auth, import, game library, game review, puzzles, training and analytics
+- Flutter/Riverpod app with real API auth, offline caches, queued offline puzzle attempts and dark mode
+- interactive Flutter chessboard with legal moves, tap/drag movement, promotion, board flip and review navigation
 - Docker Compose for PostgreSQL, Redis, API, worker and web
-- GitHub Actions for backend, web, Flutter APK artifact and Docker validation
-- unit tests for PGN parsing and move classification
+- CI for backend, web, Flutter tests/builds and Docker validation
+- dependency-aware readiness checks plus request IDs and structured HTTP request logs
 
 ## Architecture
 
-`web/` Next.js UI → `backend/` FastAPI → PostgreSQL
+`web/` Next.js and `mobile/` Flutter are clients of the FastAPI service in `backend/`.
 
-Long-running analysis is dispatched to Celery through Redis. The analysis worker owns Stockfish execution, keeping HTTP requests non-blocking. AI explanations, weakness recomputation, puzzle generation and aggregation are designed as additional worker stages, not API-thread work.
+Long-running chess work never runs inside normal HTTP request handling. Celery workers consume jobs through Redis and own Stockfish execution. The API persists analysis state in PostgreSQL and exposes live progress through SSE.
+
+Stockfish is the objective source of truth. Semantic detectors and the LLM coaching layer may explain or classify engine-backed positions, but they cannot replace engine scores, best moves or mate results.
 
 ## Run locally
 
@@ -31,12 +43,31 @@ docker compose up --build
 
 API: `http://localhost:8000`  
 OpenAPI: `http://localhost:8000/docs`  
+Liveness: `http://localhost:8000/health`  
+Readiness: `http://localhost:8000/health/ready`  
 Web: `http://localhost:3000`
 
-## First E2E target
+## Main user flow
 
-Register → import PGN → queue analysis → poll job → inspect analyzed moves → generate puzzle from a critical mistake → record attempt → update weakness/training state.
+Register → import PGN → analysis worker processes the game → inspect critical moments and coaching explanations → receive a puzzle generated from the user's own game → solve and grade it → spaced repetition and weakness statistics update → training plan adapts.
 
-## Engineering direction
+## Engineering principles
 
-The next phases should add refresh-token session persistence/rotation, semantic mistake detectors, cached engine analysis, AI-provider abstraction, WebSocket/SSE progress, real game-review board, personalized spaced repetition, analytics aggregations, opening/endgame profiling and the complete automated E2E flow.
+1. Stockfish is authoritative for objective evaluation.
+2. The LLM is an explanatory coach, not the chess oracle.
+3. Expensive work is asynchronous and idempotent.
+4. Cached normalized positions avoid repeated engine work.
+5. Long-term weakness claims are sample-size and confidence aware.
+6. Analytics are generated from persisted player data, not hardcoded demo claims.
+7. Mobile offline writes are queued and synchronized safely when connectivity returns.
+
+## Near-term roadmap
+
+- production rate limiting and abuse controls
+- email verification and password reset flows
+- opening repertoire move-tree trainer
+- dedicated endgame training modules
+- weekly report generation and notifications
+- admin/operations dashboard and feature flags
+- full automated browser/mobile E2E workflow
+- release-grade Android AAB signing pipeline
