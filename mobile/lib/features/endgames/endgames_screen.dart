@@ -138,6 +138,36 @@ class _EndgamesScreenState extends ConsumerState<EndgamesScreen> {
             Text(_message!),
           ],
           const SizedBox(height: 14),
+          if (_overview?['recommended_category'] != null) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Personalized focus',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _overview!['recommended_category']
+                          .toString()
+                          .replaceAll('_', ' '),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _overview!['recommendation_basis'] == 'real_game_accuracy'
+                          ? 'Prioritized from your weakest supported endgame category in analyzed games.'
+                          : 'Prioritized from trainer mastery until more real-game samples are available.',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           Wrap(
             spacing: 8,
             runSpacing: 8,
