@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_controller.dart';
 import '../games/games_screen.dart';
+import '../openings/openings_screen.dart';
 import '../puzzles/puzzles_screen.dart';
 import '../training/training_screen.dart';
 import 'dashboard_screen.dart';
@@ -17,7 +18,7 @@ class HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
 
-  static const _titles = ['Coach', 'Games', 'Training', 'Puzzles'];
+  static const _titles = ['Coach', 'Games', 'Training', 'Puzzles', 'Openings'];
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +49,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           GamesScreen(),
           TrainingScreen(),
           PuzzlesScreen(),
+          OpeningsScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -73,6 +75,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             icon: Icon(Icons.extension_outlined),
             selectedIcon: Icon(Icons.extension),
             label: 'Puzzles',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.menu_book_outlined),
+            selectedIcon: Icon(Icons.menu_book),
+            label: 'Openings',
           ),
         ],
       ),
