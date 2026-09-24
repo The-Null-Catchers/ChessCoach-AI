@@ -6,7 +6,7 @@ import chess
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.entities import EndgameAttempt, EndgameExercise, EndgameReviewState
+from app.models.entities import EndgameAttempt, EndgameExercise, EndgameReviewState, EndgameStat
 
 
 DEFAULT_EXERCISES = (
@@ -72,20 +72,37 @@ def ensure_review_states(db: Session, user_id: str) -> None:
 def due_endgames(db: Session, user_id: str, limit: int = 20):
     ensure_review_states(db, user_id)
     now = datetime.utcnow()
-    return db.execute(
+    rows = db.execute(
         select(EndgameExercise, EndgameReviewState)
         .join(EndgameReviewState, EndgameReviewState.exercise_id == EndgameExercise.id)
         .where(
             EndgameReviewState.user_id == user_id,
             EndgameReviewState.due_at <= now,
         )
-        .order_by(
-            EndgameReviewState.due_at.asc(),
-            EndgameReviewState.mastery.asc(),
-            EndgameExercise.difficulty.asc(),
-        )
-        .limit(limit)
     ).all()
+
+    stats = {
+        stat.category: stat
+        for stat in db.scalars(
+            select(EndgameStat).where(
+                EndgameStat.user_id == user_id,
+                EndgameStat.games_count >= 3,
+            )
+        ).all()
+    }
+
+    def priority(row):
+        exercise, state = row
+        stat = stats.get(exercise.category)
+        game_accuracy = stat.avg_accuracy if stat is not None else 101.0
+        return (
+            game_accuracy,
+            state.mastery,
+            state.due_at,
+            exercise.difficulty,
+        )
+
+    return sorted(rows, key=priority)[:limit]
 
 
 def record_endgame_attempt(
