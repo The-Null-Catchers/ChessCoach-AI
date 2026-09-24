@@ -109,6 +109,59 @@ class OpeningStat(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class OpeningRepertoire(Base):
+    __tablename__ = 'opening_repertoires'
+    __table_args__ = (UniqueConstraint('user_id', 'name', 'color', name='uq_user_repertoire_name_color'),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    name: Mapped[str] = mapped_column(String(160))
+    color: Mapped[str] = mapped_column(String(5), index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class OpeningLine(Base):
+    __tablename__ = 'opening_lines'
+    __table_args__ = (
+        UniqueConstraint('repertoire_id', 'parent_id', 'move_uci', name='uq_repertoire_parent_move'),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    repertoire_id: Mapped[str] = mapped_column(
+        ForeignKey('opening_repertoires.id', ondelete='CASCADE'),
+        index=True,
+    )
+    parent_id: Mapped[str | None] = mapped_column(
+        ForeignKey('opening_lines.id', ondelete='CASCADE'),
+        nullable=True,
+        index=True,
+    )
+    ply: Mapped[int] = mapped_column(Integer, index=True)
+    fen_before: Mapped[str] = mapped_column(String(120))
+    move_uci: Mapped[str] = mapped_column(String(8))
+    move_san: Mapped[str] = mapped_column(String(32))
+    trainable: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    source: Mapped[str] = mapped_column(String(32), default='manual')
+    repetitions: Mapped[int] = mapped_column(Integer, default=0)
+    interval_days: Mapped[int] = mapped_column(Integer, default=0)
+    ease_factor: Mapped[float] = mapped_column(Float, default=2.5)
+    lapses: Mapped[int] = mapped_column(Integer, default=0)
+    due_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    mastery: Mapped[float] = mapped_column(Float, default=0)
+
+
+class OpeningLineAttempt(Base):
+    __tablename__ = 'opening_line_attempts'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    line_id: Mapped[str] = mapped_column(ForeignKey('opening_lines.id', ondelete='CASCADE'), index=True)
+    move_uci: Mapped[str] = mapped_column(String(8))
+    correct: Mapped[bool] = mapped_column(Boolean)
+    grade: Mapped[str] = mapped_column(String(16))
+    attempted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
 class EndgameStat(Base):
     __tablename__ = 'endgame_stats'
     __table_args__ = (UniqueConstraint('user_id', 'category', name='uq_user_endgame_stat'),)
