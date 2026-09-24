@@ -31,6 +31,26 @@ type AttemptResult = {
   mastery: number;
 };
 
+type TreeLine = {
+  id: string;
+  parent_id: string | null;
+  ply: number;
+  fen_before: string;
+  move_uci: string;
+  move_san: string;
+  trainable: boolean;
+  mastery: number;
+  due_at: string;
+};
+
+type RepertoireTree = {
+  id: string;
+  name: string;
+  color: "white" | "black";
+  description: string | null;
+  lines: TreeLine[];
+};
+
 const PIECES: Record<string, string> = {
   p: "♟", r: "♜", n: "♞", b: "♝", q: "♛", k: "♚",
   P: "♙", R: "♖", N: "♘", B: "♗", Q: "♕", K: "♔",
@@ -65,6 +85,7 @@ export default function OpeningsPage() {
   const [repertoires, setRepertoires] = useState<Repertoire[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [training, setTraining] = useState<TrainingItem[]>([]);
+  const [tree, setTree] = useState<RepertoireTree | null>(null);
   const [name, setName] = useState("");
   const [color, setColor] = useState<"white" | "black">("white");
   const [pgn, setPgn] = useState("");
@@ -77,6 +98,22 @@ export default function OpeningsPage() {
   const current = training[0] ?? null;
   const squares = useMemo(() => fenSquares(current?.fen ?? "8/8/8/8/8/8/8/8 w - - 0 1"), [current]);
   const indices = useMemo(() => orientedIndices(selected?.color ?? "white"), [selected?.color]);
+  const linesByPly = useMemo(() => {
+    const grouped = new Map<number, TreeLine[]>();
+    for (const line of tree?.lines ?? []) {
+      const bucket = grouped.get(line.ply) ?? [];
+      bucket.push(line);
+      grouped.set(line.ply, bucket);
+    }
+    return [...grouped.entries()].sort((a, b) => a[0] - b[0]);
+  }, [tree]);
+  const weakBranches = useMemo(
+    () => (tree?.lines ?? [])
+      .filter((line) => line.trainable)
+      .sort((a, b) => a.mastery - b.mastery || a.ply - b.ply)
+      .slice(0, 5),
+    [tree],
+  );
 
   function authHeaders(json = false): HeadersInit {
     const token = window.localStorage.getItem("chesscoach_access_token");
@@ -93,7 +130,18 @@ export default function OpeningsPage() {
     setRepertoires(data);
     const next = preferredId ?? selectedId ?? data[0]?.id ?? null;
     setSelectedId(next);
-    if (next) await loadTraining(next);
+    if (next) {
+      await Promise.all([loadTraining(next), loadTree(next)]);
+    } else {
+      setTree(null);
+    }
+  }
+
+  async function loadTree(id: string) {
+    const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+    const response = await fetch(base + "/repertoires/" + id, { headers: authHeaders() });
+    if (!response.ok) throw new Error("Could not load repertoire tree");
+    setTree(await response.json() as RepertoireTree);
   }
 
   async function loadTraining(id: string) {
@@ -208,7 +256,10 @@ export default function OpeningsPage() {
           {repertoires.map((item) => <button
             key={item.id}
             className={item.id === selectedId ? "repertoire-card active" : "repertoire-card"}
-            onClick={() => { setSelectedId(item.id); void loadTraining(item.id); }}
+            onClick={() => {
+              setSelectedId(item.id);
+              void Promise.all([loadTraining(item.id), loadTree(item.id)]);
+            }}
           >
             <b>{item.name}</b>
             <span>{item.color} · {item.lines} nodes · {item.due} due</span>
@@ -237,6 +288,38 @@ export default function OpeningsPage() {
           <button disabled={!pgn.trim()} onClick={() => void importPgn()}>Import move tree</button>
           {message && <p className="muted">{message}</p>}
         </section> : <section className="panel"><p>Create a repertoire to start training.</p></section>}
+
+        {selected && tree && <section className="panel">
+          <div className="section-heading">
+            <div><p className="eyebrow">MOVE TREE</p><h2>Repertoire branches</h2></div>
+            <span>{tree.lines.length} nodes</span>
+          </div>
+          {tree.lines.length === 0 ? <p className="muted">Import a repertoire PGN to build the tree.</p> : <>
+            <div className="move-tree">
+              {linesByPly.map(([ply, lines]) => <div className="move-tree-column" key={ply}>
+                <small>Ply {ply}</small>
+                <div className="move-tree-nodes">
+                  {lines.map((line) => <span
+                    key={line.id}
+                    className={line.trainable ? "move-node trainable" : "move-node"}
+                    title={line.trainable ? "Your repertoire move" : "Opponent branch"}
+                  >
+                    {line.move_san}
+                    {line.trainable && <em>{Math.round(line.mastery)}%</em>}
+                  </span>)}
+                </div>
+              </div>)}
+            </div>
+            <div className="weak-branches">
+              <h3>Weak branches</h3>
+              {weakBranches.length === 0 ? <p className="muted">No trainable branches yet.</p> :
+                weakBranches.map((line) => <div key={line.id}>
+                  <b>{line.move_san}</b>
+                  <span>Ply {line.ply} · {line.mastery.toFixed(1)}% mastery</span>
+                </div>)}
+            </div>
+          </>}
+        </section>}
 
         {selected && <section className="opening-training">
           <div className="review-board" aria-label="Opening training board">
