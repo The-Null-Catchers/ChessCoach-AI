@@ -9,3 +9,6 @@ build/
 .idea/
 .vscode/
 .DS_Store
+mobile/android/key.properties
+mobile/android/app/*.jks
+mobile/android/app/*.keystore
