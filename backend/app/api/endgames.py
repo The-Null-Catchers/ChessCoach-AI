@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.games import current_user_id
 from app.db.session import get_db
-from app.models.entities import EndgameExercise, EndgameReviewState
+from app.models.entities import EndgameExercise, EndgameReviewState, EndgameStat
 from app.schemas.endgames import EndgameAttemptRequest
 from app.services.endgame_trainer import (
     due_endgames,
@@ -47,9 +47,20 @@ def overview(
         .group_by(EndgameExercise.category)
         .order_by(func.avg(EndgameReviewState.mastery).asc())
     ).all()
+    weakest_real_game = db.scalar(
+        select(EndgameStat)
+        .where(
+            EndgameStat.user_id == user_id,
+            EndgameStat.games_count >= 3,
+        )
+        .order_by(EndgameStat.avg_accuracy.asc())
+        .limit(1)
+    )
     return {
         "due": due,
         "mastery": round(float(mastery or 0) * 100, 1),
+        "recommended_category": weakest_real_game.category if weakest_real_game else None,
+        "recommendation_basis": "real_game_accuracy" if weakest_real_game else "trainer_mastery",
         "categories": [
             {
                 "category": category,
