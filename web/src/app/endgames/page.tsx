@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 type Overview = {
   due: number;
   mastery: number;
+  recommended_category: string | null;
+  recommendation_basis: "real_game_accuracy" | "trainer_mastery";
   categories: Array<{ category: string; exercises: number; mastery: number }>;
 };
 
@@ -140,6 +142,14 @@ export default function EndgamesPage() {
         <span>{item.category.replaceAll("_", " ")}</span><strong>{item.mastery.toFixed(1)}%</strong><small>{item.exercises} exercises</small>
       </div>)}
     </section>
+
+    {overview?.recommended_category && <section className="panel endgame-recommendation">
+      <p className="eyebrow">PERSONALIZED FOCUS</p>
+      <h2>{overview.recommended_category.replaceAll("_", " ")}</h2>
+      <p>{overview.recommendation_basis === "real_game_accuracy"
+        ? "Prioritized because this is currently your weakest supported endgame category in analyzed games."
+        : "Prioritized from your current trainer mastery until more real-game samples are available."}</p>
+    </section>}
 
     {message && <p className="muted">{message}</p>}
 
