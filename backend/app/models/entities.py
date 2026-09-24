@@ -174,6 +174,52 @@ class EndgameStat(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class EndgameExercise(Base):
+    __tablename__ = 'endgame_exercises'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    slug: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    category: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(180))
+    objective: Mapped[str] = mapped_column(Text)
+    fen: Mapped[str] = mapped_column(String(120))
+    solution_uci: Mapped[str] = mapped_column(String(8))
+    explanation: Mapped[str] = mapped_column(Text)
+    difficulty: Mapped[int] = mapped_column(Integer, default=1000, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class EndgameReviewState(Base):
+    __tablename__ = 'endgame_review_states'
+    __table_args__ = (UniqueConstraint('user_id', 'exercise_id', name='uq_user_endgame_review'),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    exercise_id: Mapped[str] = mapped_column(
+        ForeignKey('endgame_exercises.id', ondelete='CASCADE'),
+        index=True,
+    )
+    repetitions: Mapped[int] = mapped_column(Integer, default=0)
+    interval_days: Mapped[int] = mapped_column(Integer, default=0)
+    ease_factor: Mapped[float] = mapped_column(Float, default=2.5)
+    lapses: Mapped[int] = mapped_column(Integer, default=0)
+    mastery: Mapped[float] = mapped_column(Float, default=0)
+    due_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class EndgameAttempt(Base):
+    __tablename__ = 'endgame_attempts'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    exercise_id: Mapped[str] = mapped_column(
+        ForeignKey('endgame_exercises.id', ondelete='CASCADE'),
+        index=True,
+    )
+    move_uci: Mapped[str] = mapped_column(String(8))
+    correct: Mapped[bool] = mapped_column(Boolean)
+    grade: Mapped[str] = mapped_column(String(16))
+    attempted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
 class Move(Base):
     __tablename__ = 'moves'
     __table_args__ = (UniqueConstraint('game_id', 'ply', name='uq_game_ply'),)
