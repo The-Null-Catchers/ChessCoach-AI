@@ -86,7 +86,7 @@ export default function Home() {
     <header>
       <div><b className="brand">ChessCoach AI</b><p>Your training is generated from your games.</p></div>
       <nav className="top-nav">
-        <a href="/games">Games</a><a href="/training">Training</a><a href="/puzzles">Puzzles</a><a href="/openings">Openings</a><a href="/analytics">Analytics</a><a href="/import"><button>Import games</button></a>
+        <a href="/games">Games</a><a href="/training">Training</a><a href="/puzzles">Puzzles</a><a href="/openings">Openings</a><a href="/endgames">Endgames</a><a href="/analytics">Analytics</a><a href="/import"><button>Import games</button></a>
       </nav>
     </header>
 
