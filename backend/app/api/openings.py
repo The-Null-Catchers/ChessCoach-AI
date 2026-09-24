@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.games import current_user_id
 from app.db.session import get_db
-from app.models.entities import OpeningLine, OpeningLineAttempt, OpeningRepertoire
+from app.models.entities import OpeningLine, OpeningRepertoire
 from app.schemas.openings import OpeningAttemptRequest, RepertoireCreate, RepertoireImport
 from app.services.opening_repertoire import due_training_lines, import_repertoire_pgn, record_opening_attempt
 
