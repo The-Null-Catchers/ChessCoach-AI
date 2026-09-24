@@ -23,6 +23,7 @@ The repository now includes the core end-to-end coaching loop rather than a UI-o
 - adaptive weekly training plans and session tracking
 - analytics for phase accuracy, openings, endgames, weaknesses and evidence-based insights
 - normalized opening repertoire move trees with PGN variation import and spaced-repetition training
+- curated endgame technique trainer with legal-move validation, mastery tracking and spaced repetition
 - Next.js dashboard, auth, import, game library, game review, puzzles, training and analytics
 - Flutter/Riverpod app with real API auth, offline caches, queued offline puzzle attempts and dark mode
 - interactive Flutter chessboard with legal moves, tap/drag movement, promotion, board flip and review navigation
