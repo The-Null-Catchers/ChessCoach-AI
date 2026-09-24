@@ -20,7 +20,7 @@ services:
     depends_on: [db, redis]
   worker:
     build: ./backend
-    command: celery -A app.tasks.celery_app.celery worker -Q analysis --loglevel=INFO
+    command: celery -A app.tasks.celery_app.celery worker -Q analysis,notifications --loglevel=INFO
     environment:
       DATABASE_URL: postgresql+psycopg://chesscoach:chesscoach@db:5432/chesscoach
       REDIS_URL: redis://redis:6379/0

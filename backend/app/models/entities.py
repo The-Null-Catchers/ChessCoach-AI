@@ -308,6 +308,17 @@ class PlayerInsight(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 
+class AuthActionToken(Base):
+    __tablename__ = 'auth_action_tokens'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    purpose: Mapped[str] = mapped_column(String(32), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class RefreshSession(Base):
     __tablename__ = 'refresh_sessions'
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)

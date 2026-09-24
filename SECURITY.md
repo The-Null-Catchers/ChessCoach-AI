@@ -9,6 +9,10 @@
 - refresh replay detection with family revocation
 - logout and logout-all session invalidation
 - authentication audit events
+- one-time email verification and password-reset tokens stored only as SHA-256 hashes
+- password reset revokes all active refresh sessions
+- Redis-backed rate limiting for registration, login, verification and password reset
+- asynchronous SMTP delivery for verification/reset emails through Celery
 - per-user game and coaching authorization
 - bounded PGN upload size
 - isolated asynchronous analysis workers
@@ -31,8 +35,7 @@
 
 Before a public production launch, add:
 
-- Redis-backed rate limiting, especially for auth/import endpoints
-- email verification and password-reset token flows
+- extend rate limiting beyond auth to import/analysis/admin endpoints
 - CSRF controls if browser authentication moves to cookies
 - deeper PGN/file content validation and abuse limits
 - admin RBAC and privileged-action audit coverage
