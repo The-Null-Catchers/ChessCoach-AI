@@ -102,3 +102,39 @@ def test_endgame_queue_hides_solution_and_attempt_updates_mastery(monkeypatch):
             assert state.interval_days == 3
     finally:
         app.dependency_overrides.clear()
+
+
+def test_due_queue_prioritizes_weak_real_game_category():
+    client, testing_session = _client()
+    try:
+        with testing_session() as db:
+            from app.models.entities import EndgameStat, User
+            from app.services.endgame_trainer import due_endgames, ensure_review_states
+
+            user = User(email="priority@example.com", password_hash="hash")
+            db.add(user)
+            db.flush()
+            db.add_all([
+                EndgameStat(
+                    user_id=user.id,
+                    category="rook_endgame",
+                    games_count=5,
+                    avg_accuracy=42.0,
+                    mistakes=7,
+                ),
+                EndgameStat(
+                    user_id=user.id,
+                    category="king_pawn",
+                    games_count=5,
+                    avg_accuracy=81.0,
+                    mistakes=2,
+                ),
+            ])
+            ensure_review_states(db, user.id)
+            db.commit()
+
+            rows = due_endgames(db, user.id, limit=10)
+            assert rows
+            assert rows[0][0].category == "rook_endgame"
+    finally:
+        app.dependency_overrides.clear()
