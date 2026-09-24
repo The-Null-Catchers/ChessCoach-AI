@@ -22,6 +22,7 @@ The repository now includes the core end-to-end coaching loop rather than a UI-o
 - user-game puzzle generation and spaced repetition (Again / Hard / Good / Easy)
 - adaptive weekly training plans and session tracking
 - analytics for phase accuracy, openings, endgames, weaknesses and evidence-based insights
+- normalized opening repertoire move trees with PGN variation import and spaced-repetition training
 - Next.js dashboard, auth, import, game library, game review, puzzles, training and analytics
 - Flutter/Riverpod app with real API auth, offline caches, queued offline puzzle attempts and dark mode
 - interactive Flutter chessboard with legal moves, tap/drag movement, promotion, board flip and review navigation
@@ -66,7 +67,6 @@ Register → import PGN → analysis worker processes the game → inspect criti
 ## Near-term roadmap
 
 - admin/operations abuse controls beyond auth rate limiting
-- opening repertoire move-tree trainer
 - dedicated endgame training modules
 - weekly report generation and notifications
 - admin/operations dashboard and feature flags
