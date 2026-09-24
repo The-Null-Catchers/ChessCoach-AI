@@ -12,7 +12,14 @@ branch_labels = None
 depends_on = None
 
 
+def _has_table(name: str) -> bool:
+    return sa.inspect(op.get_bind()).has_table(name)
+
+
 def upgrade():
+    if _has_table("auth_action_tokens"):
+        return
+
     op.create_table(
         "auth_action_tokens",
         sa.Column("id", sa.String(36), primary_key=True),
@@ -31,4 +38,5 @@ def upgrade():
 
 
 def downgrade():
-    op.drop_table("auth_action_tokens")
+    if _has_table("auth_action_tokens"):
+        op.drop_table("auth_action_tokens")
