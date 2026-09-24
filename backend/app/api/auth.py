@@ -53,6 +53,8 @@ def _access_user_id(authorization: str = Header(...)) -> str:
 
 
 def _verification_email(email: str, token: str) -> None:
+    if not settings.smtp_host:
+        return
     link = f"{settings.frontend_url.rstrip('/')}/verify-email?token={token}"
     send_auth_email.delay(
         email,
@@ -62,6 +64,8 @@ def _verification_email(email: str, token: str) -> None:
 
 
 def _password_reset_email(email: str, token: str) -> None:
+    if not settings.smtp_host:
+        return
     link = f"{settings.frontend_url.rstrip('/')}/reset-password?token={token}"
     send_auth_email.delay(
         email,
