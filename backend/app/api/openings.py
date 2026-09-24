@@ -174,8 +174,6 @@ def training_queue(
         {
             "line_id": line.id,
             "fen": line.fen_before,
-            "expected_move_uci": line.move_uci,
-            "expected_move_san": line.move_san,
             "ply": line.ply,
             "mastery": round(line.mastery * 100, 1),
             "repetitions": line.repetitions,
