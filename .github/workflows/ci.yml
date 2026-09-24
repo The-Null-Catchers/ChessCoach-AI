@@ -73,6 +73,28 @@ jobs:
           channel: stable
       - working-directory: mobile
         run: flutter create . --platforms=android --org ai.chesscoach
+      - name: Smoke-test Android release signing setup
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -noprompt \
+            -keystore /tmp/chesscoach-ci-upload.jks \
+            -storepass changeit \
+            -keypass changeit \
+            -alias ci-upload \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 1 \
+            -dname "CN=ChessCoach CI"
+          export ANDROID_KEYSTORE_BASE64="$(base64 -w 0 /tmp/chesscoach-ci-upload.jks)"
+          export ANDROID_KEYSTORE_PASSWORD="changeit"
+          export ANDROID_KEY_ALIAS="ci-upload"
+          export ANDROID_KEY_PASSWORD="changeit"
+          python tool/configure_android_signing.py
+          grep -q 'signingConfig = signingConfigs.getByName("release")' android/app/build.gradle.kts
+          test -s android/app/upload-keystore.jks
+          test -s android/key.properties
       - working-directory: mobile
         run: flutter pub get
       - working-directory: mobile
