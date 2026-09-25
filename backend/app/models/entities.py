@@ -471,3 +471,16 @@ class Notification(Base):
     entity_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class FeatureFlag(Base):
+    __tablename__ = 'feature_flags'
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    updated_by_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey('users.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
