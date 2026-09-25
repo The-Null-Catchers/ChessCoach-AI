@@ -8,8 +8,8 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('registers against the real API and opens the games tab', (tester) async {
-    app.main();
-    await tester.pumpAndSettle(const Duration(seconds: 2));
+    await app.main();
+    await tester.pumpAndSettle();
 
     expect(find.text('Welcome back'), findsOneWidget);
     await tester.tap(find.text('Need an account? Register'));
@@ -19,7 +19,21 @@ void main() {
     await tester.enterText(find.byType(TextField).at(1), 'mobile-e2e@example.com');
     await tester.enterText(find.byType(TextField).at(2), 'e2e-secure-password');
     await tester.tap(find.text('Create account'));
-    await tester.pumpAndSettle(const Duration(seconds: 5));
+
+    final deadline = DateTime.now().add(const Duration(seconds: 30));
+    while (find.text('ChessCoach AI').evaluate().isEmpty &&
+        DateTime.now().isBefore(deadline)) {
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    if (find.text('ChessCoach AI').evaluate().isEmpty) {
+      final visibleText = find
+          .byType(Text)
+          .evaluate()
+          .map((element) => (element.widget as Text).data)
+          .whereType<String>()
+          .join(' | ');
+      fail('Registration did not reach the authenticated shell. Visible text: $visibleText');
+    }
 
     expect(find.text('ChessCoach AI'), findsOneWidget);
     expect(find.text('Coach'), findsWidgets);
