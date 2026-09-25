@@ -26,6 +26,14 @@ services:
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: local-dev-secret-change-me
     depends_on: [db, redis]
+  beat:
+    build: ./backend
+    command: celery -A app.tasks.celery_app.celery beat --loglevel=INFO
+    environment:
+      DATABASE_URL: postgresql+psycopg://chesscoach:chesscoach@db:5432/chesscoach
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: local-dev-secret-change-me
+    depends_on: [db, redis]
   web:
     build: ./web
     ports: ["3000:3000"]
