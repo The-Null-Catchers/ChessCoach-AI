@@ -100,7 +100,6 @@ def list_games(user_id: str = Depends(current_user_id), db: Session = Depends(ge
 
 @router.get('/{game_id}/analysis')
 def game_analysis(game_id: str, user_id: str = Depends(current_user_id), db: Session = Depends(get_db)):
-    enforce_rate_limit(request, REANALYSIS_LIMIT, subject=user_id)
     game = db.scalar(select(Game).where(Game.id == game_id, Game.user_id == user_id))
     if not game: raise HTTPException(404, 'Game not found')
     moves = db.scalars(select(Move).where(Move.game_id == game_id).order_by(Move.ply)).all()
@@ -121,6 +120,7 @@ def identify_player(
     user_id: str = Depends(current_user_id),
     db: Session = Depends(get_db),
 ):
+    enforce_rate_limit(request, REANALYSIS_LIMIT, subject=user_id)
     game = db.scalar(select(Game).where(Game.id == game_id, Game.user_id == user_id))
     if not game:
         raise HTTPException(404, 'Game not found')
