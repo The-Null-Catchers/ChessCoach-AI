@@ -4,12 +4,13 @@ from datetime import datetime
 from typing import Literal
 
 import chess
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.api.games import current_user_id
+from app.core.rate_limit import PUZZLE_ATTEMPT_LIMIT, enforce_rate_limit
 from app.db.session import get_db
 from app.models.entities import (
     AIExplanation,
@@ -210,9 +211,11 @@ def puzzle_queue(
 def attempt_puzzle(
     puzzle_id: str,
     payload: PuzzleAttemptRequest,
+    request: Request,
     user_id: str = Depends(current_user_id),
     db: Session = Depends(get_db),
 ):
+    enforce_rate_limit(request, PUZZLE_ATTEMPT_LIMIT, subject=user_id)
     puzzle = db.scalar(select(Puzzle).where(Puzzle.id == puzzle_id, Puzzle.user_id == user_id))
     if not puzzle:
         raise HTTPException(404, "Puzzle not found")
