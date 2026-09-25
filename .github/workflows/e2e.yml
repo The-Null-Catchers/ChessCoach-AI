@@ -1,0 +1,176 @@
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: chesscoach
+          POSTGRES_USER: chesscoach
+          POSTGRES_PASSWORD: chesscoach
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chesscoach -d chesscoach"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://chesscoach:chesscoach@localhost:5432/chesscoach
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: e2e-only-secret
+      ADMIN_EMAILS: admin-e2e@example.com
+      CORS_ORIGINS: http://127.0.0.1:3000
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:8000/api/v1
+      E2E_WEB_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Start API
+        run: |
+          python -m pip install -r backend/requirements.txt
+          cd backend
+          alembic upgrade head
+          cd ..
+          nohup python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000 >/tmp/chesscoach-api.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/chesscoach-api.log
+          exit 1
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - name: Install browser dependencies
+        working-directory: web
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+      - name: Start web client
+        working-directory: web
+        run: |
+          nohup npm run dev -- --hostname 0.0.0.0 >/tmp/chesscoach-web.log 2>&1 &
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:3000/login >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/chesscoach-web.log
+          exit 1
+      - name: Run Playwright E2E
+        working-directory: web
+        run: npm run e2e
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-report
+          path: web/playwright-report
+          if-no-files-found: ignore
+
+  mobile-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: chesscoach
+          POSTGRES_USER: chesscoach
+          POSTGRES_PASSWORD: chesscoach
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chesscoach -d chesscoach"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://chesscoach:chesscoach@localhost:5432/chesscoach
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: mobile-e2e-only-secret
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Start API
+        run: |
+          python -m pip install -r backend/requirements.txt
+          cd backend
+          alembic upgrade head
+          cd ..
+          nohup python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000 >/tmp/chesscoach-api.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/chesscoach-api.log
+          exit 1
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Prepare Android project
+        working-directory: mobile
+        run: |
+          flutter create . --platforms=android --org ai.chesscoach
+          flutter pub get
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("android/app/src/main/AndroidManifest.xml")
+          text = path.read_text()
+          text = text.replace("<application", '<application android:usesCleartextTraffic="true"', 1)
+          path.write_text(text)
+          PY
+      - name: Run Android integration test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: cd mobile && flutter test integration_test/auth_flow_test.dart -d emulator-5554 --dart-define=API_URL=http://10.0.2.2:8000/api/v1
