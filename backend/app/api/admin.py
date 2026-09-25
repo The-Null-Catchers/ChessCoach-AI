@@ -10,14 +10,20 @@ from sqlalchemy.orm import Session
 
 from app.api.games import current_user_id
 from app.db.session import get_db
-from app.models.entities import AnalysisJob, AuditLog, Game, RefreshSession, User
+from app.models.entities import AnalysisJob, AuditLog, FeatureFlag, Game, RefreshSession, User
 from app.services.auth_sessions import revoke_all_user_sessions
+from app.services.feature_flags import list_flags, set_flag
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 class SuspensionRequest(BaseModel):
     reason: str = Field(min_length=3, max_length=255)
+
+
+class FeatureFlagUpdate(BaseModel):
+    enabled: bool
+    description: str | None = Field(default=None, max_length=255)
 
 
 def require_admin(
@@ -130,3 +136,59 @@ def unsuspend_user(
     ))
     db.commit()
     return {"id": target.id, "is_suspended": False}
+
+
+@router.get("/feature-flags")
+def feature_flags(
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    flags = list_flags(db)
+    db.commit()
+    return [
+        {
+            "key": flag.key,
+            "enabled": flag.enabled,
+            "description": flag.description,
+            "updated_by_user_id": flag.updated_by_user_id,
+            "updated_at": flag.updated_at.isoformat(),
+        }
+        for flag in flags
+    ]
+
+
+@router.put("/feature-flags/{key}")
+def update_feature_flag(
+    key: str,
+    payload: FeatureFlagUpdate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    normalized = key.strip().lower().replace(" ", "_")
+    if not normalized or len(normalized) > 80:
+        raise HTTPException(status_code=422, detail="Invalid feature flag key")
+    if not all(char.isalnum() or char in {"_", "-", "."} for char in normalized):
+        raise HTTPException(status_code=422, detail="Invalid feature flag key")
+
+    flag = set_flag(
+        db,
+        key=normalized,
+        enabled=payload.enabled,
+        description=payload.description,
+        admin_user_id=admin.id,
+    )
+    db.add(AuditLog(
+        user_id=admin.id,
+        action="admin.feature_flag_updated",
+        entity_type="feature_flag",
+        entity_id=flag.key,
+        metadata_json=json.dumps({"enabled": flag.enabled}),
+    ))
+    db.commit()
+    return {
+        "key": flag.key,
+        "enabled": flag.enabled,
+        "description": flag.description,
+        "updated_by_user_id": flag.updated_by_user_id,
+        "updated_at": flag.updated_at.isoformat(),
+    }
