@@ -100,6 +100,8 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     user = db.scalar(select(User).where(User.email == payload.email.lower()))
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    if user.is_suspended:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account suspended")
 
     access, refresh = issue_session_tokens(db, user_id=user.id)
     db.add(AuditLog(user_id=user.id, action="auth.login", entity_type="user", entity_id=user.id))
