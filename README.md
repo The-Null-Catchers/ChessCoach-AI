@@ -33,6 +33,7 @@ The repository now includes the core end-to-end coaching loop rather than a UI-o
 - manual production Android workflow that builds a signed AAB from protected GitHub Environment secrets and emits a SHA-256 checksum
 - dependency-aware readiness checks plus request IDs and structured HTTP request logs
 - admin operations API with account suspension, session revocation, audit logging and per-user abuse limits for expensive operations
+- idempotent weekly progress reports with in-app notifications, read state and scheduled email delivery
 
 ## Architecture
 
@@ -70,6 +71,5 @@ Register → import PGN → analysis worker processes the game → inspect criti
 
 ## Near-term roadmap
 
-- weekly report generation and notifications
 - admin/operations dashboard and feature flags
 - full automated browser/mobile E2E workflow
