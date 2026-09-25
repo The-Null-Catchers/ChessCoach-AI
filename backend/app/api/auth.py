@@ -42,6 +42,11 @@ from app.tasks.email import send_auth_email
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+def _is_bootstrap_admin(email: str) -> bool:
+    allowed = {item.strip().lower() for item in settings.admin_emails.split(",") if item.strip()}
+    return email.lower() in allowed
+
+
 def _access_user_id(authorization: str = Header(...)) -> str:
     try:
         scheme, token = authorization.split(" ", 1)
@@ -81,7 +86,11 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    user = User(email=email, password_hash=hash_password(payload.password))
+    user = User(
+        email=email,
+        password_hash=hash_password(payload.password),
+        is_admin=_is_bootstrap_admin(email),
+    )
     user.profile = Profile(display_name=payload.display_name)
     db.add(user)
     db.flush()
@@ -100,6 +109,16 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     user = db.scalar(select(User).where(User.email == payload.email.lower()))
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    if user.is_suspended:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account suspended")
+    if _is_bootstrap_admin(user.email) and not user.is_admin:
+        user.is_admin = True
+        db.add(AuditLog(
+            user_id=user.id,
+            action="admin.bootstrap_granted",
+            entity_type="user",
+            entity_id=user.id,
+        ))
 
     access, refresh = issue_session_tokens(db, user_id=user.id)
     db.add(AuditLog(user_id=user.id, action="auth.login", entity_type="user", entity_id=user.id))

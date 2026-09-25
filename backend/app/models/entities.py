@@ -28,6 +28,10 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    is_suspended: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    suspended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    suspension_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     profile = relationship('Profile', back_populates='user', uselist=False, cascade='all, delete-orphan')
 

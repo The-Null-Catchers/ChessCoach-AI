@@ -2,12 +2,13 @@ from __future__ import annotations
 import jwt
 from typing import Literal
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.config import settings
+from app.core.rate_limit import GAME_IMPORT_LIMIT, REANALYSIS_LIMIT, enforce_rate_limit
 from app.db.session import get_db
-from app.models.entities import Game, GamePlayer, Move, AnalysisJob, EngineAnalysis
+from app.models.entities import Game, GamePlayer, Move, AnalysisJob, EngineAnalysis, User
 from app.services.player_identity import link_game_players
 from app.services.pgn import parse_pgn_many
 from app.tasks.analysis import analyze_game
@@ -17,20 +18,33 @@ router = APIRouter(prefix='/games', tags=['games'])
 class IdentifyPlayerRequest(BaseModel):
     color: Literal["white", "black"]
 
-def current_user_id(authorization: str = Header(...)) -> str:
+def current_user_id(
+    authorization: str = Header(...),
+    db: Session = Depends(get_db),
+) -> str:
     try:
         scheme, token = authorization.split(' ', 1)
-        if scheme.lower() != 'bearer': raise ValueError
+        if scheme.lower() != 'bearer':
+            raise ValueError
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-        if payload.get('type') != 'access': raise ValueError
-        return str(payload['sub'])
+        if payload.get('type') != 'access':
+            raise ValueError
+        user_id = str(payload['sub'])
     except Exception as exc:
         raise HTTPException(status_code=401, detail='Invalid access token') from exc
 
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=401, detail='Account not found')
+    if user.is_suspended:
+        raise HTTPException(status_code=403, detail='Account suspended')
+    return user_id
+
 @router.post('/import', status_code=202)
-async def import_games(pgn_text: str | None = Form(default=None), file: UploadFile | None = File(default=None),
+async def import_games(request: Request, pgn_text: str | None = Form(default=None), file: UploadFile | None = File(default=None),
                        player_name: str | None = Form(default=None),
                        user_id: str = Depends(current_user_id), db: Session = Depends(get_db)):
+    enforce_rate_limit(request, GAME_IMPORT_LIMIT, subject=user_id)
     if not pgn_text and not file:
         raise HTTPException(400, 'Provide PGN text or file')
     if file:
@@ -102,9 +116,11 @@ def game_analysis(game_id: str, user_id: str = Depends(current_user_id), db: Ses
 def identify_player(
     game_id: str,
     payload: IdentifyPlayerRequest,
+    request: Request,
     user_id: str = Depends(current_user_id),
     db: Session = Depends(get_db),
 ):
+    enforce_rate_limit(request, REANALYSIS_LIMIT, subject=user_id)
     game = db.scalar(select(Game).where(Game.id == game_id, Game.user_id == user_id))
     if not game:
         raise HTTPException(404, 'Game not found')
