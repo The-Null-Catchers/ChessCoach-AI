@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     auth_action_token_minutes: int = 30
     rate_limit_enabled: bool = True
     rate_limit_fail_open: bool = True
+    admin_emails: str = ''
     frontend_url: str = 'http://localhost:3000'
     smtp_host: str = ''
     smtp_port: int = 587
