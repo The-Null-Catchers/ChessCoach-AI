@@ -34,6 +34,7 @@ The repository now includes the core end-to-end coaching loop rather than a UI-o
 - dependency-aware readiness checks plus request IDs and structured HTTP request logs
 - admin operations API with account suspension, session revocation, audit logging and per-user abuse limits for expensive operations
 - idempotent weekly progress reports with in-app notifications, read state and scheduled email delivery
+- web admin operations dashboard with account controls, system metrics and audited runtime feature flags
 
 ## Architecture
 
@@ -71,5 +72,4 @@ Register → import PGN → analysis worker processes the game → inspect criti
 
 ## Near-term roadmap
 
-- admin/operations dashboard and feature flags
 - full automated browser/mobile E2E workflow
