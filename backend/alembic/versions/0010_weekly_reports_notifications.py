@@ -1,12 +1,12 @@
 """weekly reports and notifications
 
-Revision ID: 0010_weekly_reports_notifications
+Revision ID: 0010_weekly_reports
 Revises: 0009_admin_abuse_controls
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0010_weekly_reports_notifications"
+revision = "0010_weekly_reports"
 down_revision = "0009_admin_abuse_controls"
 branch_labels = None
 depends_on = None
