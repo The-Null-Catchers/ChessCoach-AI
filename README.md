@@ -32,6 +32,7 @@ The repository now includes the core end-to-end coaching loop rather than a UI-o
 - CI security gates for Python/Node dependencies plus repository vulnerability, secret and misconfiguration scanning
 - manual production Android workflow that builds a signed AAB from protected GitHub Environment secrets and emits a SHA-256 checksum
 - dependency-aware readiness checks plus request IDs and structured HTTP request logs
+- admin operations API with account suspension, session revocation, audit logging and per-user abuse limits for expensive operations
 
 ## Architecture
 
@@ -69,7 +70,6 @@ Register → import PGN → analysis worker processes the game → inspect criti
 
 ## Near-term roadmap
 
-- admin/operations abuse controls beyond auth rate limiting
 - weekly report generation and notifications
 - admin/operations dashboard and feature flags
 - full automated browser/mobile E2E workflow
