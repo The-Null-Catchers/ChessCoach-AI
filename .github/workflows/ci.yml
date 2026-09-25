@@ -1,16 +1,22 @@
 name: CI
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
 jobs:
   backend:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17-alpine
@@ -29,9 +35,10 @@ jobs:
       DATABASE_URL: postgresql+psycopg://chesscoach:chesscoach@localhost:5432/chesscoach
       JWT_SECRET: ci-only-secret
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: '3.12'}
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
       - run: pip install -r backend/requirements.txt
       - run: ruff check backend/app backend/tests
       - working-directory: backend
@@ -42,23 +49,52 @@ jobs:
 
   web:
     runs-on: ubuntu-latest
-    defaults: {run: {working-directory: web}}
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: {node-version: '22'}
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          package-manager-cache: false
       - run: npm install
       - run: npm run typecheck
       - run: npm run build
 
   flutter:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
-        with: {channel: stable}
+        with:
+          channel: stable
       - working-directory: mobile
         run: flutter create . --platforms=android --org ai.chesscoach
+      - name: Smoke-test Android release signing setup
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -noprompt \
+            -keystore /tmp/chesscoach-ci-upload.jks \
+            -storepass changeit \
+            -keypass changeit \
+            -alias ci-upload \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 1 \
+            -dname "CN=ChessCoach CI"
+          export ANDROID_KEYSTORE_BASE64="$(base64 -w 0 /tmp/chesscoach-ci-upload.jks)"
+          export ANDROID_KEYSTORE_PASSWORD="changeit"
+          export ANDROID_KEY_ALIAS="ci-upload"
+          export ANDROID_KEY_PASSWORD="changeit"
+          python tool/configure_android_signing.py
+          grep -q 'signingConfig = signingConfigs.getByName("release")' android/app/build.gradle.kts
+          test -s android/app/upload-keystore.jks
+          test -s android/key.properties
       - working-directory: mobile
         run: flutter pub get
       - working-directory: mobile
@@ -67,12 +103,51 @@ jobs:
         run: flutter test
       - working-directory: mobile
         run: flutter build apk --debug
-      - uses: actions/upload-artifact@v4
-        with: {name: chesscoach-debug-apk, path: mobile/build/app/outputs/flutter-apk/app-debug.apk}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: chesscoach-debug-apk
+          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
 
   docker:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -t chesscoach-backend ./backend
       - run: docker build -t chesscoach-web ./web
+
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Audit Python dependencies
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip pip-audit
+      - run: pip-audit -r backend/requirements.txt
+
+      - name: Audit web dependencies
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - working-directory: web
+        run: npm install --package-lock-only --ignore-scripts --no-audit
+      - working-directory: web
+        run: npm audit --audit-level=high
+
+      - name: Scan repository for vulnerabilities, secrets and misconfiguration
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table

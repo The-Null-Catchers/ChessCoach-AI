@@ -1,0 +1,81 @@
+name: Android Release AAB
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_name:
+        description: Artifact name
+        required: false
+        default: chesscoach-android-release
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PRODUCTION_API_URL: ${{ vars.PRODUCTION_API_URL }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Validate release configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PRODUCTION_API_URL" || { echo "PRODUCTION_API_URL is required"; exit 1; }
+          case "$PRODUCTION_API_URL" in
+            https://*) ;;
+            *) echo "PRODUCTION_API_URL must use HTTPS"; exit 1 ;;
+          esac
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            test -n "${!name:-}" || { echo "$name is required"; exit 1; }
+          done
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: flutter create . --platforms=android --org ai.chesscoach
+
+      - name: Install Flutter dependencies
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Configure release signing
+        working-directory: mobile
+        run: python tool/configure_android_signing.py
+
+      - name: Analyze Flutter
+        working-directory: mobile
+        run: flutter analyze
+
+      - name: Test Flutter
+        working-directory: mobile
+        run: flutter test
+
+      - name: Build signed release AAB
+        working-directory: mobile
+        run: flutter build appbundle --release --dart-define=API_URL="$PRODUCTION_API_URL"
+
+      - name: Create checksum
+        working-directory: mobile
+        run: sha256sum build/app/outputs/bundle/release/app-release.aab > build/app/outputs/bundle/release/app-release.aab.sha256
+
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: |
+            mobile/build/app/outputs/bundle/release/app-release.aab
+            mobile/build/app/outputs/bundle/release/app-release.aab.sha256
+          if-no-files-found: error
+          retention-days: 14

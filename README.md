@@ -29,6 +29,8 @@ The repository now includes the core end-to-end coaching loop rather than a UI-o
 - interactive Flutter chessboard with legal moves, tap/drag movement, promotion, board flip and review navigation
 - Docker Compose for PostgreSQL, Redis, API, worker and web
 - CI for backend, web, Flutter tests/builds and Docker validation
+- CI security gates for Python/Node dependencies plus repository vulnerability, secret and misconfiguration scanning
+- manual production Android workflow that builds a signed AAB from protected GitHub Environment secrets and emits a SHA-256 checksum
 - dependency-aware readiness checks plus request IDs and structured HTTP request logs
 
 ## Architecture
@@ -68,8 +70,6 @@ Register → import PGN → analysis worker processes the game → inspect criti
 ## Near-term roadmap
 
 - admin/operations abuse controls beyond auth rate limiting
-- dedicated endgame training modules
 - weekly report generation and notifications
 - admin/operations dashboard and feature flags
 - full automated browser/mobile E2E workflow
-- release-grade Android AAB signing pipeline

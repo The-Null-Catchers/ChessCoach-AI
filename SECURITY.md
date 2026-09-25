@@ -19,6 +19,9 @@
 - controlled CORS from configuration
 - dependency-aware readiness checks that fail closed
 - request IDs and structured request logging without query-string logging
+- CI dependency auditing for Python and Node dependencies
+- repository vulnerability, secret and misconfiguration scanning with failing HIGH/CRITICAL gates
+- production Android signing material supplied only through GitHub Environment secrets; signing files are generated at build time and ignored by Git
 
 ## Production deployment requirements
 
@@ -39,6 +42,5 @@ Before a public production launch, add:
 - CSRF controls if browser authentication moves to cookies
 - deeper PGN/file content validation and abuse limits
 - admin RBAC and privileged-action audit coverage
-- dependency and secret scanning gates in CI
 - security headers at the ingress/web layer
 - documented backup, restore and key-rotation procedures
