@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 
 from app.core.config import settings
 
@@ -19,6 +20,6 @@ celery.conf.task_routes = {
 celery.conf.beat_schedule = {
     "weekly-player-reports": {
         "task": "app.tasks.reports.generate_all_weekly_reports",
-        "schedule": 604800.0,
+        "schedule": crontab(hour=7, minute=0, day_of_week=1),
     },
 }
