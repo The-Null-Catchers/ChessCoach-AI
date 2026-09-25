@@ -23,7 +23,7 @@ def _client_key(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def enforce_rate_limit(request: Request, rule: RateLimitRule) -> None:
+def enforce_rate_limit(request: Request, rule: RateLimitRule, *, subject: str | None = None) -> None:
     if not settings.rate_limit_enabled:
         return
 
@@ -33,7 +33,8 @@ def enforce_rate_limit(request: Request, rule: RateLimitRule) -> None:
         socket_timeout=1,
         decode_responses=True,
     )
-    key = f"ratelimit:{rule.name}:{_client_key(request)}"
+    identity = subject or _client_key(request)
+    key = f"ratelimit:{rule.name}:{identity}"
     try:
         count = redis.incr(key)
         if count == 1:
@@ -61,3 +62,6 @@ LOGIN_LIMIT = RateLimitRule("login", 10, 60)
 REGISTER_LIMIT = RateLimitRule("register", 5, 60)
 PASSWORD_RESET_LIMIT = RateLimitRule("password-reset", 5, 300)
 VERIFY_LIMIT = RateLimitRule("verify-email", 10, 300)
+GAME_IMPORT_LIMIT = RateLimitRule("game-import", 20, 3600)
+REANALYSIS_LIMIT = RateLimitRule("game-reanalysis", 30, 3600)
+PUZZLE_ATTEMPT_LIMIT = RateLimitRule("puzzle-attempt", 120, 60)
