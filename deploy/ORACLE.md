@@ -11,12 +11,12 @@ This deployment is designed to coexist with other applications on a small Oracle
 - Celery beat: 256 MB / 0.15 CPU
 - Web: 768 MB / 0.4 CPU
 
-The database and Redis are private to the Compose network. Only the web and API are exposed on loopback:
+The database and Redis are private to the Compose network. For initial IP-only testing, the web and API are exposed on host ports:
 
-- Web: 127.0.0.1:3100
-- API: 127.0.0.1:8100
+- Web: 3100
+- API: 8100
 
-Caddy should terminate HTTPS and proxy to those loopback ports.
+When a real domain is available, prefer putting Caddy in front and binding these services back to loopback.
 
 ## First deploy
 
