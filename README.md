@@ -35,6 +35,7 @@ The repository now includes the core end-to-end coaching loop rather than a UI-o
 - admin operations API with account suspension, session revocation, audit logging and per-user abuse limits for expensive operations
 - idempotent weekly progress reports with in-app notifications, read state and scheduled email delivery
 - web admin operations dashboard with account controls, system metrics and audited runtime feature flags
+- automated Playwright browser E2E plus real Android-emulator Flutter integration tests against PostgreSQL/Redis/FastAPI
 
 ## Architecture
 
@@ -72,4 +73,4 @@ Register → import PGN → analysis worker processes the game → inspect criti
 
 ## Near-term roadmap
 
-- full automated browser/mobile E2E workflow
+The previously listed product-completeness roadmap is implemented. Remaining work should be driven by deployment evidence, production telemetry and concrete user feedback rather than parallel feature rewrites.
