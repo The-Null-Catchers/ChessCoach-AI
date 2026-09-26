@@ -1,0 +1,55 @@
+name: Android Test APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: API base URL used by the test APK
+        required: true
+        default: http://82.70.209.175:8100/api/v1
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: flutter create . --platforms=android --org ai.chesscoach
+
+      - name: Allow HTTP for temporary IP testing
+        working-directory: mobile
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          s = s.replace("<application", '<application android:usesCleartextTraffic="true"', 1)
+          p.write_text(s)
+          PY
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Build debug APK
+        working-directory: mobile
+        run: flutter build apk --debug --dart-define=API_URL="${{ inputs.api_url }}"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: chesscoach-ip-test-apk
+          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
