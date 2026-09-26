@@ -23,7 +23,7 @@ npm run e2e
 
 ## Android
 
-The mobile job boots an Android emulator and runs the Flutter integration test against the real API on the host through `10.0.2.2`.
+The mobile job boots an Android emulator, reverses emulator TCP port 8000 to the runner with `adb reverse`, and runs the Flutter integration test against the real API through `127.0.0.1:8000` inside Android.
 
 The integration test creates an account, verifies the authenticated shell, opens the Games tab, confirms the empty-library state, and signs out.
 
@@ -32,5 +32,5 @@ The CI-only generated Android manifest permits cleartext traffic because the tes
 ```bash
 cd mobile
 flutter test integration_test/auth_flow_test.dart -d <device> \
-  --dart-define=API_URL=http://<reachable-host>:8000/api/v1
+  --dart-define=API_URL=http://127.0.0.1:8000/api/v1
 ```
