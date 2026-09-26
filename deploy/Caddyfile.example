@@ -1,0 +1,7 @@
+chess.example.com {
+    reverse_proxy 127.0.0.1:3100
+}
+
+api.chess.example.com {
+    reverse_proxy 127.0.0.1:8100
+}
