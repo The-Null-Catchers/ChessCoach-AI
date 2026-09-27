@@ -28,6 +28,8 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   double _elo = 1400;
   String _difficulty = 'intermediate';
   String _style = 'balanced';
+  bool _coachMode = true;
+  bool _showHint = false;
   final List<Map<String, dynamic>> _history = [];
   int _clockIndex = 2;
   Map<String, dynamic>? _state;
@@ -78,6 +80,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       _message = null;
       _savedGameId = null;
       _timedOut = null;
+      _showHint = false;
     });
     try {
       final result = await ref.read(apiClientProvider).postJson(
@@ -160,6 +163,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           'elo': _elo.round(),
           'difficulty': _difficulty,
           'style': _style,
+          'coach_mode': _coachMode,
         },
       );
       final next = Map<String, dynamic>.from(result as Map);
@@ -174,6 +178,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           ..clear()
           ..addAll(nextMoves);
         _busy = false;
+        _showHint = false;
         if (increment > 0) {
           if (mover == 'white' && _whiteSeconds != null) _whiteSeconds = _whiteSeconds! + increment;
           if (mover == 'black' && _blackSeconds != null) _blackSeconds = _blackSeconds! + increment;
@@ -280,6 +285,15 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
               ],
               onSelected: (value) => setState(() => _style = value ?? 'balanced'),
             ),
+            DropdownMenu<String>(
+              label: const Text('Coach mode'),
+              initialSelection: _coachMode ? 'on' : 'off',
+              dropdownMenuEntries: const [
+                DropdownMenuEntry(value: 'on', label: 'On · live feedback'),
+                DropdownMenuEntry(value: 'off', label: 'Off · no live evaluation'),
+              ],
+              onSelected: (value) => setState(() => _coachMode = value != 'off'),
+            ),
             DropdownMenu<int>(
               label: const Text('Clock'),
               initialSelection: _clockIndex,
@@ -342,6 +356,29 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           _ClockTile(label: 'White', value: _clockText(_whiteSeconds), active: state['turn'] == 'white'),
           const SizedBox(height: 12),
           Text(status, style: Theme.of(context).textTheme.titleMedium),
+          if (_coachMode && state['coach_feedback'] is Map) ...[
+            const SizedBox(height: 8),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Builder(
+                  builder: (context) {
+                    final feedback = Map<String, dynamic>.from(state['coach_feedback'] as Map);
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('COACH FEEDBACK', style: Theme.of(context).textTheme.labelSmall),
+                        const SizedBox(height: 4),
+                        Text('${feedback['title']}', style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 4),
+                        Text('${feedback['message']}'),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
           if (state['challenge'] is Map) ...[
             const SizedBox(height: 8),
             Card(
