@@ -5,6 +5,7 @@ import '../auth/auth_controller.dart';
 import '../endgames/endgames_screen.dart';
 import '../games/games_screen.dart';
 import '../openings/openings_screen.dart';
+import '../play/play_screen.dart';
 import '../puzzles/puzzles_screen.dart';
 import '../training/training_screen.dart';
 import 'dashboard_screen.dart';
@@ -19,7 +20,7 @@ class HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
 
-  static const _titles = ['Coach', 'Games', 'Training', 'Puzzles', 'Openings', 'Endgames'];
+  static const _titles = ['Coach', 'Play', 'Games', 'Training', 'Puzzles', 'Openings', 'Endgames'];
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +48,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         index: _index,
         children: const [
           CoachDashboard(),
+          PlayScreen(),
           GamesScreen(),
           TrainingScreen(),
           PuzzlesScreen(),
@@ -62,6 +64,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             icon: Icon(Icons.psychology_alt_outlined),
             selectedIcon: Icon(Icons.psychology_alt),
             label: 'Coach',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.play_circle_outline),
+            selectedIcon: Icon(Icons.play_circle),
+            label: 'Play',
           ),
           NavigationDestination(
             icon: Icon(Icons.sports_esports_outlined),
