@@ -34,3 +34,18 @@ def test_build_pgn_supports_custom_fen_and_result():
     assert '[SetUp "1"]' in pgn
     assert '[Result "1-0"]' in pgn
     assert "Qg7#" in pgn
+
+
+def test_build_pgn_accepts_explicit_resignation_result():
+    payload = PlayCompleteRequest(
+        moves=["e2e4", "e7e5"],
+        player_color="white",
+        opponent="engine",
+        level=8,
+        elo=1500,
+        result_override="0-1",
+        termination="resignation",
+    )
+    pgn = _build_pgn(payload)
+    assert '[Result "0-1"]' in pgn
+    assert '[Termination "resignation"]' in pgn
