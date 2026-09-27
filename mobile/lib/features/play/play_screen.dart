@@ -407,8 +407,15 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                         Text('LIVE CHALLENGE', style: Theme.of(context).textTheme.labelSmall),
                         const SizedBox(height: 4),
                         Text('${challenge['title']}', style: Theme.of(context).textTheme.titleMedium),
-                        const SizedBox(height: 4),
-                        Text('${challenge['hint']}'),
+                        const SizedBox(height: 6),
+                        if (_showHint)
+                          Text('${challenge['hint']}')
+                        else
+                          OutlinedButton.icon(
+                            onPressed: () => setState(() => _showHint = true),
+                            icon: const Icon(Icons.lightbulb_outline),
+                            label: const Text('Show hint'),
+                          ),
                       ],
                     );
                   },
