@@ -52,6 +52,7 @@ class PlayMoveRequest(BaseModel):
     elo: int | None = Field(default=None, ge=800, le=2800)
     difficulty: Difficulty = "intermediate"
     style: EngineStyle = "balanced"
+    coach_mode: bool = False
 
 
 class PlayCompleteRequest(BaseModel):
@@ -128,6 +129,63 @@ def _apply_uci(board: chess.Board, move_uci: str) -> chess.Move:
         raise HTTPException(status_code=422, detail="Illegal move")
     board.push(move)
     return move
+
+
+def _feedback_from_loss(loss_cp: int) -> dict:
+    if loss_cp <= 15:
+        return {
+            "classification": "excellent",
+            "title": "Excellent choice",
+            "message": "Your move stayed very close to the strongest continuation.",
+        }
+    if loss_cp <= 50:
+        return {
+            "classification": "good",
+            "title": "Good move",
+            "message": "The idea is sound. Keep checking forcing replies before committing.",
+        }
+    if loss_cp <= 100:
+        return {
+            "classification": "inaccuracy",
+            "title": "Small inaccuracy",
+            "message": "Your position is still playable, but there was a more precise continuation.",
+        }
+    if loss_cp <= 220:
+        return {
+            "classification": "mistake",
+            "title": "This deserves another look",
+            "message": "The move gave away a meaningful part of your position. Re-scan checks, captures and threats.",
+        }
+    return {
+        "classification": "blunder",
+        "title": "Critical mistake",
+        "message": "The evaluation dropped sharply. Before moving, verify opponent checks, captures and direct threats.",
+    }
+
+
+def _coach_feedback(board: chess.Board, move: chess.Move) -> dict:
+    player = board.turn
+    engine = chess.engine.SimpleEngine.popen_uci(settings.stockfish_path)
+    try:
+        limit = chess.engine.Limit(depth=10, time=0.12)
+        before = engine.analyse(board, limit)
+        before_score = before["score"].pov(player).score(mate_score=100000) or 0
+        best_pv = before.get("pv", [])
+        best_move = best_pv[0].uci() if best_pv else None
+
+        after_board = board.copy(stack=False)
+        after_board.push(move)
+        after = engine.analyse(after_board, limit)
+        after_score = after["score"].pov(player).score(mate_score=100000) or 0
+        loss_cp = max(0, min(100000, before_score - after_score))
+        feedback = _feedback_from_loss(loss_cp)
+        return {
+            **feedback,
+            "centipawn_loss": loss_cp,
+            "best_move_available": best_move is not None and best_move != move.uci(),
+        }
+    finally:
+        engine.quit()
 
 
 def _style_score(board: chess.Board, move: chess.Move, style: EngineStyle) -> int:
@@ -265,13 +323,25 @@ def play_move(
     if payload.opponent == "engine" and board.turn != player_turn:
         raise HTTPException(status_code=409, detail="It is not the player's turn")
 
+    try:
+        move = chess.Move.from_uci(payload.move_uci.strip().lower())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Invalid UCI move") from exc
+    if move not in board.legal_moves:
+        raise HTTPException(status_code=422, detail="Illegal move")
+
+    coach_feedback = _coach_feedback(board, move) if payload.coach_mode else None
     player_move = _apply_uci(board, payload.move_uci).uci()
     engine_move = None
     if payload.opponent == "engine" and not board.is_game_over(claim_draw=True):
         effective_elo = payload.elo or DIFFICULTY_ELO[payload.difficulty]
         engine_move = _engine_move(board, payload.level, effective_elo, payload.style)
 
-    return {**_state(board, engine_move=engine_move), "player_move": player_move}
+    return {
+        **_state(board, engine_move=engine_move),
+        "player_move": player_move,
+        "coach_feedback": coach_feedback,
+    }
 
 
 @router.post("/complete", status_code=202)
