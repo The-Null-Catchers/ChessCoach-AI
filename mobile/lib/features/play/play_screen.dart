@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -108,11 +109,24 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
         _busy = false;
       });
       _startClock();
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
+      var message = 'Could not start the game.';
+      if (error is DioException) {
+        final detail = error.response?.data is Map
+            ? (error.response?.data as Map)['detail']
+            : null;
+        if (detail is String && detail.isNotEmpty) {
+          message = 'Could not start the game: $detail';
+        } else if (error.response?.statusCode != null) {
+          message = 'Could not start the game (HTTP ${error.response!.statusCode}).';
+        } else {
+          message = 'Could not reach ChessCoach API. Check the server connection.';
+        }
+      }
       setState(() {
         _busy = false;
-        _message = 'Could not start the game. Check the FEN and connection.';
+        _message = message;
       });
     }
   }
