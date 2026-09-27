@@ -2,7 +2,7 @@ import chess
 import pytest
 from fastapi import HTTPException
 
-from app.api.play import PlayCompleteRequest, _apply_uci, _build_pgn, _state, _style_score, _training_challenge
+from app.api.play import PlayCompleteRequest, _apply_uci, _build_pgn, _feedback_from_loss, _state, _style_score, _training_challenge
 
 
 def test_apply_uci_and_state_expose_legal_moves():
@@ -74,3 +74,11 @@ def test_pgn_records_engine_persona():
     pgn = _build_pgn(payload)
     assert '[EngineStyle "positional"]' in pgn
     assert '[EngineDifficulty "advanced"]' in pgn
+
+
+@pytest.mark.parametrize(
+    ("loss_cp", "classification"),
+    [(0, "excellent"), (15, "excellent"), (16, "good"), (75, "inaccuracy"), (150, "mistake"), (300, "blunder")],
+)
+def test_live_coach_feedback_thresholds(loss_cp, classification):
+    assert _feedback_from_loss(loss_cp)["classification"] == classification

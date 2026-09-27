@@ -16,3 +16,5 @@
 .play-actions{display:flex;gap:8px;flex-wrap:wrap}.play-actions button{flex:1;min-width:110px}
 
 .play-challenge{display:grid;gap:6px;padding:12px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.03)}.play-challenge p{margin:0}
+
+.coach-feedback{display:grid;gap:6px;padding:12px;border-radius:14px;border-left:4px solid #d8ff78;background:#20281f}.coach-feedback p{margin:0}.coach-feedback.inaccuracy{border-left-color:#d8cf78}.coach-feedback.mistake{border-left-color:#e0a85b}.coach-feedback.blunder{border-left-color:#ff8d8d}

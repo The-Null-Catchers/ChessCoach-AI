@@ -13,6 +13,7 @@ type PlayState = {
   engine_move: string | null;
   player_move?: string;
   challenge?: { kind: string; title: string; hint: string } | null;
+  coach_feedback?: { classification: string; title: string; message: string; centipawn_loss: number; best_move_available: boolean } | null;
 };
 
 type Opponent = "engine" | "local";
@@ -68,6 +69,8 @@ export default function PlayPage() {
   const [elo, setElo] = useState(1400);
   const [difficulty, setDifficulty] = useState<Difficulty>("intermediate");
   const [style, setStyle] = useState<EngineStyle>("balanced");
+  const [coachMode, setCoachMode] = useState(true);
+  const [showHint, setShowHint] = useState(false);
   const [history, setHistory] = useState<PlayState[]>([]);
   const [customFen, setCustomFen] = useState("");
   const [clockIndex, setClockIndex] = useState(2);
@@ -113,7 +116,7 @@ export default function PlayPage() {
   }
 
   async function start() {
-    setBusy(true); setError(""); setReviewGameId(null); setTimedOut(null); setSelected(null);
+    setBusy(true); setError(""); setReviewGameId(null); setTimedOut(null); setSelected(null); setShowHint(false);
     try {
       const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
       const response = await fetch(base + "/play/start", {
@@ -169,7 +172,7 @@ export default function PlayPage() {
         method: "POST", headers: headers(),
         body: JSON.stringify({
           fen: state.fen, move_uci: uci, opponent,
-          player_color: playerColor, level, elo, difficulty, style,
+          player_color: playerColor, level, elo, difficulty, style, coach_mode: coachMode,
         }),
       });
       if (!response.ok) throw new Error((await response.json()).detail ?? "Move rejected");
@@ -179,6 +182,7 @@ export default function PlayPage() {
       const nextMoves = [...moves, ...added];
       setMoves(nextMoves);
       setState(next);
+      setShowHint(false);
 
       const inc = clocks[clockIndex].increment;
       if (inc > 0) {
@@ -239,6 +243,7 @@ export default function PlayPage() {
       }}><option value="beginner">Beginner · 900</option><option value="intermediate">Intermediate · 1400</option><option value="advanced">Advanced · 1900</option><option value="master">Master · 2400</option></select></div>
       <div><label>Engine style</label><select value={style} disabled={opponent === "local"} onChange={(e) => setStyle(e.target.value as EngineStyle)}><option value="balanced">Balanced</option><option value="aggressive">Aggressive</option><option value="positional">Positional</option><option value="defensive">Defensive</option></select></div>
       <div><label>Fine tune ELO · {elo}</label><input type="range" min="800" max="2800" step="100" value={elo} disabled={opponent === "local"} onChange={(e) => setElo(Number(e.target.value))}/></div>
+      <div><label>Coach mode</label><select value={coachMode ? "on" : "off"} onChange={(e) => setCoachMode(e.target.value === "on")}><option value="on">On · feedback after moves</option><option value="off">Off · no live evaluation</option></select></div>
       <div><label>Clock</label><select value={clockIndex} onChange={(e) => setClockIndex(Number(e.target.value))}>{clocks.map((clock, index) => <option key={clock.label} value={index}>{clock.label}</option>)}</select></div>
       <div className="fen-field"><label>Custom FEN (optional)</label><input value={customFen} placeholder="Leave empty for the normal starting position" onChange={(e) => setCustomFen(e.target.value)}/></div>
       <button onClick={() => void start()} disabled={busy}>{state ? "New game" : "Start game"}</button>
@@ -274,7 +279,8 @@ export default function PlayPage() {
         <p className="eyebrow">LIVE GAME</p>
         <h2>{status}</h2>
         <p className="muted">{opponent === "engine" ? `${style[0].toUpperCase() + style.slice(1)} engine · ${difficulty} · ELO ${elo}. Completed games go straight into coaching analysis.` : "Pass the device between players. Legal moves are enforced by the server."}</p>
-        {state?.challenge && !state.game_over && <div className="play-challenge"><span className="eyebrow">LIVE CHALLENGE</span><strong>{state.challenge.title}</strong><p>{state.challenge.hint}</p></div>}
+        {state?.coach_feedback && coachMode && <div className={"coach-feedback " + state.coach_feedback.classification}><span className="eyebrow">COACH FEEDBACK</span><strong>{state.coach_feedback.title}</strong><p>{state.coach_feedback.message}</p></div>}
+        {state?.challenge && !state.game_over && <div className="play-challenge"><span className="eyebrow">LIVE CHALLENGE</span><strong>{state.challenge.title}</strong>{showHint ? <p>{state.challenge.hint}</p> : <button className="ghost" onClick={() => setShowHint(true)}>Show hint</button>}</div>}
         <div className="play-moves">
           {moves.length ? moves.map((move, index) => <code key={index}>{index + 1}. {move}</code>) : <span className="muted">Moves will appear here.</span>}
         </div>
