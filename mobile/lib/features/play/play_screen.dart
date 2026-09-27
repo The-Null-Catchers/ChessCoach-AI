@@ -85,7 +85,6 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           'player_color': _playerColor,
           'level': _level.round(),
           'elo': _elo.round(),
-          'elo': _elo.round(),
           'initial_fen': _fenController.text.trim().isEmpty ? null : _fenController.text.trim(),
         },
       );
@@ -152,6 +151,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           'opponent': _opponent,
           'player_color': _playerColor,
           'level': _level.round(),
+          'elo': _elo.round(),
         },
       );
       final next = Map<String, dynamic>.from(result as Map);
