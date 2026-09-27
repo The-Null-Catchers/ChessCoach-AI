@@ -66,6 +66,8 @@ jobs:
   flutter:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      MOBILE_API_URL: ${{ vars.MOBILE_API_URL || 'http://82.70.209.175:8100/api/v1' }}
     steps:
       - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
@@ -95,6 +97,18 @@ jobs:
           grep -q 'signingConfig = signingConfigs.getByName("release")' android/app/build.gradle.kts
           test -s android/app/upload-keystore.jks
           test -s android/key.properties
+      - name: Configure device-test networking
+        working-directory: mobile
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          if "android:usesCleartextTraffic" not in s:
+              s = s.replace("<application", '<application android:usesCleartextTraffic="true"', 1)
+          p.write_text(s)
+          PY
       - working-directory: mobile
         run: flutter pub get
       - working-directory: mobile
@@ -102,10 +116,10 @@ jobs:
       - working-directory: mobile
         run: flutter test
       - working-directory: mobile
-        run: flutter build apk --debug
+        run: flutter build apk --debug --dart-define=API_URL="$MOBILE_API_URL"
       - uses: actions/upload-artifact@v6
         with:
-          name: chesscoach-debug-apk
+          name: chesscoach-device-test-apk
           path: mobile/build/app/outputs/flutter-apk/app-debug.apk
 
   docker:
