@@ -22,6 +22,15 @@ router = APIRouter(prefix="/play", tags=["play"])
 Opponent = Literal["engine", "local"]
 Color = Literal["white", "black"]
 ResultOverride = Literal["1-0", "0-1", "1/2-1/2", "*"]
+EngineStyle = Literal["balanced", "aggressive", "positional", "defensive"]
+Difficulty = Literal["beginner", "intermediate", "advanced", "master"]
+
+DIFFICULTY_ELO = {
+    "beginner": 900,
+    "intermediate": 1400,
+    "advanced": 1900,
+    "master": 2400,
+}
 
 
 class PlayStartRequest(BaseModel):
@@ -29,6 +38,8 @@ class PlayStartRequest(BaseModel):
     player_color: Color = "white"
     level: int = Field(default=8, ge=1, le=20)
     elo: int | None = Field(default=None, ge=800, le=2800)
+    difficulty: Difficulty = "intermediate"
+    style: EngineStyle = "balanced"
     initial_fen: str | None = None
 
 
@@ -39,6 +50,8 @@ class PlayMoveRequest(BaseModel):
     player_color: Color = "white"
     level: int = Field(default=8, ge=1, le=20)
     elo: int | None = Field(default=None, ge=800, le=2800)
+    difficulty: Difficulty = "intermediate"
+    style: EngineStyle = "balanced"
 
 
 class PlayCompleteRequest(BaseModel):
@@ -48,6 +61,8 @@ class PlayCompleteRequest(BaseModel):
     opponent: Opponent = "engine"
     level: int = Field(default=8, ge=1, le=20)
     elo: int | None = Field(default=None, ge=800, le=2800)
+    difficulty: Difficulty = "intermediate"
+    style: EngineStyle = "balanced"
     time_control: str | None = Field(default=None, max_length=64)
     result_override: ResultOverride | None = None
     termination: str | None = Field(default=None, max_length=40)
@@ -63,6 +78,32 @@ def _board_from_fen(fen: str | None) -> chess.Board:
     return board
 
 
+def _training_challenge(board: chess.Board) -> dict | None:
+    if board.is_game_over(claim_draw=True):
+        return None
+    legal = list(board.legal_moves)
+    if board.is_check():
+        return {"kind": "survive_check", "title": "Get out of check", "hint": "Find a legal response that keeps your position coordinated."}
+    checking = []
+    captures = []
+    for move in legal:
+        if board.is_capture(move):
+            captures.append(move.uci())
+        probe = board.copy(stack=False)
+        probe.push(move)
+        if probe.is_check():
+            checking.append(move.uci())
+    if checking:
+        return {"kind": "forcing_move", "title": "Look for a forcing move", "hint": "There is at least one legal check in the position."}
+    if captures:
+        return {"kind": "tactical_scan", "title": "Scan all captures", "hint": "Before moving, compare every legal capture with your quiet candidate."}
+    if board.fullmove_number <= 8:
+        return {"kind": "development", "title": "Develop with purpose", "hint": "Prioritize development, central control and king safety."}
+    if len(board.piece_map()) <= 12:
+        return {"kind": "endgame", "title": "Activate your king", "hint": "In reduced material, improve king activity and passed-pawn potential."}
+    return {"kind": "plan", "title": "Name your plan first", "hint": "Identify your worst-placed piece before choosing a move."}
+
+
 def _state(board: chess.Board, *, engine_move: str | None = None) -> dict:
     outcome = board.outcome(claim_draw=True)
     return {
@@ -74,6 +115,7 @@ def _state(board: chess.Board, *, engine_move: str | None = None) -> dict:
         "result": outcome.result() if outcome else None,
         "termination": outcome.termination.name.lower() if outcome else None,
         "engine_move": engine_move,
+        "challenge": _training_challenge(board),
     }
 
 
@@ -88,7 +130,44 @@ def _apply_uci(board: chess.Board, move_uci: str) -> chess.Move:
     return move
 
 
-def _engine_move(board: chess.Board, level: int, elo: int | None = None) -> str:
+def _style_score(board: chess.Board, move: chess.Move, style: EngineStyle) -> int:
+    if style == "balanced":
+        return 0
+    score = 0
+    if style == "aggressive":
+        if board.is_capture(move):
+            score += 3
+        probe = board.copy(stack=False)
+        probe.push(move)
+        if probe.is_check():
+            score += 4
+        if move.promotion:
+            score += 2
+    elif style == "positional":
+        if move.to_square in (chess.D4, chess.E4, chess.D5, chess.E5):
+            score += 2
+        if chess.square_rank(move.from_square) in (0, 7) and board.piece_at(move.from_square) and board.piece_at(move.from_square).piece_type in (chess.KNIGHT, chess.BISHOP):
+            score += 2
+        if board.is_castling(move):
+            score += 3
+    elif style == "defensive":
+        if board.is_castling(move):
+            score += 4
+        if board.is_capture(move):
+            score += 1
+        probe = board.copy(stack=False)
+        probe.push(move)
+        if not probe.is_check():
+            score += 1
+    return score
+
+
+def _engine_move(
+    board: chess.Board,
+    level: int,
+    elo: int | None = None,
+    style: EngineStyle = "balanced",
+) -> str:
     if board.is_game_over(claim_draw=True):
         raise HTTPException(status_code=409, detail="Game is already over")
     engine = chess.engine.SimpleEngine.popen_uci(settings.stockfish_path)
@@ -103,11 +182,24 @@ def _engine_move(board: chess.Board, level: int, elo: int | None = None) -> str:
             engine.configure(options)
         # Keep interactive play responsive while still scaling effort with level.
         limit = chess.engine.Limit(time=0.04 + level * 0.018, depth=min(6 + level, 22))
-        result = engine.play(board, limit)
-        if result.move is None:
+        if style == "balanced":
+            result = engine.play(board, limit)
+            move = result.move
+        else:
+            lines = engine.analyse(board, limit, multipv=4)
+            candidates = [line.get("pv", [None])[0] for line in lines]
+            candidates = [move for move in candidates if move is not None]
+            if not candidates:
+                move = None
+            else:
+                move = max(
+                    enumerate(candidates),
+                    key=lambda item: (_style_score(board, item[1], style) - item[0], -item[0]),
+                )[1]
+        if move is None:
             raise HTTPException(status_code=503, detail="Engine did not return a move")
-        uci = result.move.uci()
-        board.push(result.move)
+        uci = move.uci()
+        board.push(move)
         return uci
     finally:
         engine.quit()
@@ -117,6 +209,8 @@ def _build_pgn(payload: PlayCompleteRequest) -> str:
     board = _board_from_fen(payload.initial_fen)
     game = chess.pgn.Game()
     game.headers["Event"] = "ChessCoach Play & Learn"
+    game.headers["EngineStyle"] = payload.style
+    game.headers["EngineDifficulty"] = payload.difficulty
     game.headers["Site"] = "ChessCoach AI"
     game.headers["White"] = "You" if payload.player_color == "white" else (
         "ChessCoach Engine" if payload.opponent == "engine" else "Local player"
@@ -155,7 +249,8 @@ def start_game(
     engine_move = None
     player_turn = chess.WHITE if payload.player_color == "white" else chess.BLACK
     if payload.opponent == "engine" and board.turn != player_turn and not board.is_game_over(claim_draw=True):
-        engine_move = _engine_move(board, payload.level, payload.elo)
+        effective_elo = payload.elo or DIFFICULTY_ELO[payload.difficulty]
+        engine_move = _engine_move(board, payload.level, effective_elo, payload.style)
     return _state(board, engine_move=engine_move)
 
 
@@ -173,7 +268,8 @@ def play_move(
     player_move = _apply_uci(board, payload.move_uci).uci()
     engine_move = None
     if payload.opponent == "engine" and not board.is_game_over(claim_draw=True):
-        engine_move = _engine_move(board, payload.level)
+        effective_elo = payload.elo or DIFFICULTY_ELO[payload.difficulty]
+        engine_move = _engine_move(board, payload.level, effective_elo, payload.style)
 
     return {**_state(board, engine_move=engine_move), "player_move": player_move}
 
