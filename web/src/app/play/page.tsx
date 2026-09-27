@@ -12,15 +12,24 @@ type PlayState = {
   termination: string | null;
   engine_move: string | null;
   player_move?: string;
+  challenge?: { kind: string; title: string; hint: string } | null;
 };
 
 type Opponent = "engine" | "local";
 type Color = "white" | "black";
+type EngineStyle = "balanced" | "aggressive" | "positional" | "defensive";
+type Difficulty = "beginner" | "intermediate" | "advanced" | "master";
 
 const initialFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const glyphs: Record<string, string> = {
   K: "♔", Q: "♕", R: "♖", B: "♗", N: "♘", P: "♙",
   k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟",
+};
+const difficultyElo: Record<Difficulty, number> = {
+  beginner: 900,
+  intermediate: 1400,
+  advanced: 1900,
+  master: 2400,
 };
 const clocks = [
   { label: "No clock", seconds: null as number | null, increment: 0, value: "-" },
@@ -56,7 +65,9 @@ export default function PlayPage() {
   const [opponent, setOpponent] = useState<Opponent>("engine");
   const [playerColor, setPlayerColor] = useState<Color>("white");
   const [level, setLevel] = useState(8);
-  const [elo, setElo] = useState(1600);
+  const [elo, setElo] = useState(1400);
+  const [difficulty, setDifficulty] = useState<Difficulty>("intermediate");
+  const [style, setStyle] = useState<EngineStyle>("balanced");
   const [history, setHistory] = useState<PlayState[]>([]);
   const [customFen, setCustomFen] = useState("");
   const [clockIndex, setClockIndex] = useState(2);
@@ -108,7 +119,7 @@ export default function PlayPage() {
       const response = await fetch(base + "/play/start", {
         method: "POST", headers: headers(),
         body: JSON.stringify({
-          opponent, player_color: playerColor, level, elo,
+          opponent, player_color: playerColor, level, elo, difficulty, style,
           initial_fen: customFen.trim() || null,
         }),
       });
@@ -135,6 +146,8 @@ export default function PlayPage() {
         opponent,
         level,
         elo,
+        difficulty,
+        style,
         result_override: resultOverride ?? null,
         termination: termination ?? null,
         time_control: clocks[clockIndex].value,
@@ -156,7 +169,7 @@ export default function PlayPage() {
         method: "POST", headers: headers(),
         body: JSON.stringify({
           fen: state.fen, move_uci: uci, opponent,
-          player_color: playerColor, level, elo,
+          player_color: playerColor, level, elo, difficulty, style,
         }),
       });
       if (!response.ok) throw new Error((await response.json()).detail ?? "Move rejected");
@@ -219,7 +232,13 @@ export default function PlayPage() {
     <section className="play-config panel">
       <div><label>Opponent</label><select value={opponent} onChange={(e) => setOpponent(e.target.value as Opponent)}><option value="engine">ChessCoach Engine</option><option value="local">Local two-player</option></select></div>
       <div><label>Your color</label><select value={playerColor} disabled={opponent === "local"} onChange={(e) => setPlayerColor(e.target.value as Color)}><option value="white">White</option><option value="black">Black</option></select></div>
-      <div><label>Engine ELO · {elo}</label><input type="range" min="800" max="2800" step="100" value={elo} disabled={opponent === "local"} onChange={(e) => setElo(Number(e.target.value))}/></div>
+      <div><label>Difficulty</label><select value={difficulty} disabled={opponent === "local"} onChange={(e) => {
+        const next = e.target.value as Difficulty;
+        setDifficulty(next);
+        setElo(difficultyElo[next]);
+      }}><option value="beginner">Beginner · 900</option><option value="intermediate">Intermediate · 1400</option><option value="advanced">Advanced · 1900</option><option value="master">Master · 2400</option></select></div>
+      <div><label>Engine style</label><select value={style} disabled={opponent === "local"} onChange={(e) => setStyle(e.target.value as EngineStyle)}><option value="balanced">Balanced</option><option value="aggressive">Aggressive</option><option value="positional">Positional</option><option value="defensive">Defensive</option></select></div>
+      <div><label>Fine tune ELO · {elo}</label><input type="range" min="800" max="2800" step="100" value={elo} disabled={opponent === "local"} onChange={(e) => setElo(Number(e.target.value))}/></div>
       <div><label>Clock</label><select value={clockIndex} onChange={(e) => setClockIndex(Number(e.target.value))}>{clocks.map((clock, index) => <option key={clock.label} value={index}>{clock.label}</option>)}</select></div>
       <div className="fen-field"><label>Custom FEN (optional)</label><input value={customFen} placeholder="Leave empty for the normal starting position" onChange={(e) => setCustomFen(e.target.value)}/></div>
       <button onClick={() => void start()} disabled={busy}>{state ? "New game" : "Start game"}</button>
@@ -254,7 +273,8 @@ export default function PlayPage() {
       <aside className="panel play-sidebar">
         <p className="eyebrow">LIVE GAME</p>
         <h2>{status}</h2>
-        <p className="muted">{opponent === "engine" ? "Stockfish adapts to the selected strength. Every completed game is queued for the same coaching analysis used on imported games." : "Pass the device between players. Legal moves are enforced by the server."}</p>
+        <p className="muted">{opponent === "engine" ? `${style[0].toUpperCase() + style.slice(1)} engine · ${difficulty} · ELO ${elo}. Completed games go straight into coaching analysis.` : "Pass the device between players. Legal moves are enforced by the server."}</p>
+        {state?.challenge && !state.game_over && <div className="play-challenge"><span className="eyebrow">LIVE CHALLENGE</span><strong>{state.challenge.title}</strong><p>{state.challenge.hint}</p></div>}
         <div className="play-moves">
           {moves.length ? moves.map((move, index) => <code key={index}>{index + 1}. {move}</code>) : <span className="muted">Moves will appear here.</span>}
         </div>
