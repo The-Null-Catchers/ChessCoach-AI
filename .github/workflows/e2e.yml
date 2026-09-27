@@ -278,12 +278,106 @@ jobs:
       - name: Run full Android integration test
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 34
           arch: x86_64
-          profile: pixel_6
+          profile: pixel_4
+          cores: 2
+          ram-size: 4096M
+          heap-size: 512M
+          emulator-boot-timeout: 900
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
           script: adb -s emulator-5554 reverse tcp:8000 tcp:8000 && cd mobile && flutter test integration_test/auth_flow_test.dart -d emulator-5554 --dart-define=API_URL=http://127.0.0.1:8000/api/v1
       - name: Print API log on mobile failure
         if: failure()
         run: cat /tmp/chesscoach-api.log || true
+
+  mobile-api35-compat:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: chesscoach
+          POSTGRES_USER: chesscoach
+          POSTGRES_PASSWORD: chesscoach
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chesscoach -d chesscoach"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://chesscoach:chesscoach@localhost:5432/chesscoach
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: mobile-api35-compat-only-secret
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Start API
+        run: |
+          python -m pip install -r backend/requirements.txt
+          cd backend
+          alembic upgrade head
+          cd ..
+          nohup python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000 >/tmp/chesscoach-api-api35.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/chesscoach-api-api35.log
+          exit 1
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Prepare Android API 35 project
+        working-directory: mobile
+        run: |
+          flutter create . --platforms=android --org ai.chesscoach
+          python tool/configure_branding.py
+          flutter pub get
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("android/app/src/main/AndroidManifest.xml")
+          text = path.read_text()
+          text = text.replace("<application", '<application android:usesCleartextTraffic="true"', 1)
+          path.write_text(text)
+          PY
+      - name: Run Android 15 compatibility test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_4
+          cores: 2
+          ram-size: 4096M
+          heap-size: 512M
+          emulator-boot-timeout: 900
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
+          script: adb -s emulator-5554 reverse tcp:8000 tcp:8000 && cd mobile && flutter test integration_test/auth_flow_test.dart -d emulator-5554 --dart-define=API_URL=http://127.0.0.1:8000/api/v1
+      - name: Print API log on Android 15 compatibility failure
+        if: failure()
+        run: cat /tmp/chesscoach-api-api35.log || true
