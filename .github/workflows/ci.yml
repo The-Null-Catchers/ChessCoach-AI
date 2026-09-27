@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      MOBILE_API_URL: ${{ vars.MOBILE_API_URL || 'http://82.70.209.175:8100/api/v1' }}
+      MOBILE_API_URL: ${{ vars.MOBILE_API_URL || 'http://82.70.209.175:3100/api/v1' }}
     steps:
       - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2

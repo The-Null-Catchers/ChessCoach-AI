@@ -1,0 +1,7 @@
+# Preferred HTTPS setup once a domain is available.
+chess.example.com {
+    reverse_proxy 127.0.0.1:3100
+}
+
+# The web app proxies /api/v1/* internally to the backend, so a separate
+# public API port/domain is optional.
