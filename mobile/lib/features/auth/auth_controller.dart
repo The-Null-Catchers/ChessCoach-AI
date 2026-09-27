@@ -97,6 +97,12 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  void clearError() {
+    if (!state.loading && state.error != null) {
+      state = const AuthState.signedOut();
+    }
+  }
+
   Future<void> logout() async {
     state = const AuthState.submitting();
     await api.logout();
