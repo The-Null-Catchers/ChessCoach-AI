@@ -442,16 +442,6 @@ class _ChessPositionBoardState extends State<ChessPositionBoard> {
                     ),
                   ),
                 ),
-                if (_submitting)
-                  ColoredBox(
-                    color: colorScheme.surface.withValues(alpha: 0.12),
-                    child: const Center(
-                      child: SizedBox.square(
-                        dimension: 28,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                      ),
-                    ),
-                  ),
               ],
             ),
           ),
