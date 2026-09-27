@@ -21,12 +21,14 @@ router = APIRouter(prefix="/play", tags=["play"])
 
 Opponent = Literal["engine", "local"]
 Color = Literal["white", "black"]
+ResultOverride = Literal["1-0", "0-1", "1/2-1/2", "*"]
 
 
 class PlayStartRequest(BaseModel):
     opponent: Opponent = "engine"
     player_color: Color = "white"
     level: int = Field(default=8, ge=1, le=20)
+    elo: int | None = Field(default=None, ge=800, le=2800)
     initial_fen: str | None = None
 
 
@@ -36,6 +38,7 @@ class PlayMoveRequest(BaseModel):
     opponent: Opponent = "engine"
     player_color: Color = "white"
     level: int = Field(default=8, ge=1, le=20)
+    elo: int | None = Field(default=None, ge=800, le=2800)
 
 
 class PlayCompleteRequest(BaseModel):
@@ -44,7 +47,10 @@ class PlayCompleteRequest(BaseModel):
     player_color: Color = "white"
     opponent: Opponent = "engine"
     level: int = Field(default=8, ge=1, le=20)
+    elo: int | None = Field(default=None, ge=800, le=2800)
     time_control: str | None = Field(default=None, max_length=64)
+    result_override: ResultOverride | None = None
+    termination: str | None = Field(default=None, max_length=40)
 
 
 def _board_from_fen(fen: str | None) -> chess.Board:
@@ -82,13 +88,19 @@ def _apply_uci(board: chess.Board, move_uci: str) -> chess.Move:
     return move
 
 
-def _engine_move(board: chess.Board, level: int) -> str:
+def _engine_move(board: chess.Board, level: int, elo: int | None = None) -> str:
     if board.is_game_over(claim_draw=True):
         raise HTTPException(status_code=409, detail="Game is already over")
     engine = chess.engine.SimpleEngine.popen_uci(settings.stockfish_path)
     try:
-        if "Skill Level" in engine.options:
-            engine.configure({"Skill Level": level})
+        options: dict[str, int | bool] = {}
+        if elo is not None and "UCI_LimitStrength" in engine.options and "UCI_Elo" in engine.options:
+            options["UCI_LimitStrength"] = True
+            options["UCI_Elo"] = elo
+        elif "Skill Level" in engine.options:
+            options["Skill Level"] = level
+        if options:
+            engine.configure(options)
         # Keep interactive play responsive while still scaling effort with level.
         limit = chess.engine.Limit(time=0.04 + level * 0.018, depth=min(6 + level, 22))
         result = engine.play(board, limit)
@@ -126,7 +138,9 @@ def _build_pgn(payload: PlayCompleteRequest) -> str:
         # SAN is intentionally computed from the position before the move.
         _ = before.san(move)
 
-    game.headers["Result"] = board.result(claim_draw=True) if board.is_game_over(claim_draw=True) else "*"
+    game.headers["Result"] = payload.result_override or (board.result(claim_draw=True) if board.is_game_over(claim_draw=True) else "*")
+    if payload.termination:
+        game.headers["Termination"] = payload.termination
     exporter = chess.pgn.StringExporter(headers=True, variations=False, comments=False)
     return game.accept(exporter)
 
@@ -141,7 +155,7 @@ def start_game(
     engine_move = None
     player_turn = chess.WHITE if payload.player_color == "white" else chess.BLACK
     if payload.opponent == "engine" and board.turn != player_turn and not board.is_game_over(claim_draw=True):
-        engine_move = _engine_move(board, payload.level)
+        engine_move = _engine_move(board, payload.level, payload.elo)
     return _state(board, engine_move=engine_move)
 
 
