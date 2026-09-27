@@ -23,6 +23,9 @@ jobs:
       - name: Generate Android project
         working-directory: mobile
         run: flutter create . --platforms=android --org ai.chesscoach
+      - name: Apply ChessCoach AI branding
+        working-directory: mobile
+        run: python tool/configure_branding.py
       - name: Allow HTTP for temporary IP testing
         working-directory: mobile
         shell: bash
