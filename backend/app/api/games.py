@@ -79,8 +79,19 @@ async def import_games(request: Request, pgn_text: str | None = Form(default=Non
     return {'count': len(imported), 'games': imported}
 
 @router.get('')
-def list_games(user_id: str = Depends(current_user_id), db: Session = Depends(get_db), limit: int = 20, offset: int = 0):
-    rows = db.scalars(select(Game).where(Game.user_id == user_id).order_by(Game.created_at.desc()).offset(offset).limit(min(limit, 100))).all()
+def list_games(
+    user_id: str = Depends(current_user_id),
+    db: Session = Depends(get_db),
+    limit: int = 20,
+    offset: int = 0,
+    source: str | None = None,
+):
+    query = select(Game).where(Game.user_id == user_id)
+    if source:
+        query = query.where(Game.source == source)
+    rows = db.scalars(
+        query.order_by(Game.created_at.desc()).offset(offset).limit(min(limit, 100))
+    ).all()
     result = []
     for g in rows:
         player = db.scalar(select(GamePlayer).where(GamePlayer.game_id == g.id, GamePlayer.user_id == user_id))
@@ -95,6 +106,7 @@ def list_games(user_id: str = Depends(current_user_id), db: Session = Depends(ge
             'time_control': g.time_control,
             'analyzed': g.analyzed,
             'player_color': player.color if player else None,
+            'source': g.source,
         })
     return result
 
