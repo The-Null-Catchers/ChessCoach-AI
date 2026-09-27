@@ -56,6 +56,8 @@ export default function PlayPage() {
   const [opponent, setOpponent] = useState<Opponent>("engine");
   const [playerColor, setPlayerColor] = useState<Color>("white");
   const [level, setLevel] = useState(8);
+  const [elo, setElo] = useState(1600);
+  const [history, setHistory] = useState<PlayState[]>([]);
   const [customFen, setCustomFen] = useState("");
   const [clockIndex, setClockIndex] = useState(2);
   const [state, setState] = useState<PlayState | null>(null);
@@ -106,13 +108,14 @@ export default function PlayPage() {
       const response = await fetch(base + "/play/start", {
         method: "POST", headers: headers(),
         body: JSON.stringify({
-          opponent, player_color: playerColor, level,
+          opponent, player_color: playerColor, level, elo,
           initial_fen: customFen.trim() || null,
         }),
       });
       if (!response.ok) throw new Error((await response.json()).detail ?? "Could not start game");
       const next = await response.json() as PlayState;
       setState(next);
+      setHistory([]);
       setMoves(next.engine_move ? [next.engine_move] : []);
       const seconds = clocks[clockIndex].seconds;
       setWhiteSeconds(seconds); setBlackSeconds(seconds);
@@ -121,7 +124,7 @@ export default function PlayPage() {
     } finally { setBusy(false); }
   }
 
-  async function saveForReview(finalMoves: string[]) {
+  async function saveForReview(finalMoves: string[], resultOverride?: string, termination?: string) {
     const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
     const response = await fetch(base + "/play/complete", {
       method: "POST", headers: headers(),
@@ -131,6 +134,9 @@ export default function PlayPage() {
         player_color: playerColor,
         opponent,
         level,
+        elo,
+        result_override: resultOverride ?? null,
+        termination: termination ?? null,
         time_control: clocks[clockIndex].value,
       }),
     });
@@ -150,11 +156,12 @@ export default function PlayPage() {
         method: "POST", headers: headers(),
         body: JSON.stringify({
           fen: state.fen, move_uci: uci, opponent,
-          player_color: playerColor, level,
+          player_color: playerColor, level, elo,
         }),
       });
       if (!response.ok) throw new Error((await response.json()).detail ?? "Move rejected");
       const next = await response.json() as PlayState;
+      setHistory((items) => [...items, state]);
       const added = [uci, ...(next.engine_move ? [next.engine_move] : [])];
       const nextMoves = [...moves, ...added];
       setMoves(nextMoves);
@@ -212,7 +219,7 @@ export default function PlayPage() {
     <section className="play-config panel">
       <div><label>Opponent</label><select value={opponent} onChange={(e) => setOpponent(e.target.value as Opponent)}><option value="engine">ChessCoach Engine</option><option value="local">Local two-player</option></select></div>
       <div><label>Your color</label><select value={playerColor} disabled={opponent === "local"} onChange={(e) => setPlayerColor(e.target.value as Color)}><option value="white">White</option><option value="black">Black</option></select></div>
-      <div><label>Engine strength · {level}/20</label><input type="range" min="1" max="20" value={level} disabled={opponent === "local"} onChange={(e) => setLevel(Number(e.target.value))}/></div>
+      <div><label>Engine ELO · {elo}</label><input type="range" min="800" max="2800" step="100" value={elo} disabled={opponent === "local"} onChange={(e) => setElo(Number(e.target.value))}/></div>
       <div><label>Clock</label><select value={clockIndex} onChange={(e) => setClockIndex(Number(e.target.value))}>{clocks.map((clock, index) => <option key={clock.label} value={index}>{clock.label}</option>)}</select></div>
       <div className="fen-field"><label>Custom FEN (optional)</label><input value={customFen} placeholder="Leave empty for the normal starting position" onChange={(e) => setCustomFen(e.target.value)}/></div>
       <button onClick={() => void start()} disabled={busy}>{state ? "New game" : "Start game"}</button>
@@ -252,7 +259,26 @@ export default function PlayPage() {
           {moves.length ? moves.map((move, index) => <code key={index}>{index + 1}. {move}</code>) : <span className="muted">Moves will appear here.</span>}
         </div>
         {reviewGameId && <a href={"/games/" + reviewGameId}><button>Review this game</button></a>}
-        {state && !state.game_over && !timedOut && <button className="ghost" onClick={() => { setTimedOut(state.turn); }}>Resign</button>}
+        {state && !state.game_over && !timedOut && <div className="play-actions">
+          {opponent === "local" && history.length > 0 && <button className="ghost" onClick={() => {
+            const previous = history[history.length - 1];
+            setState(previous);
+            setHistory((items) => items.slice(0, -1));
+            setMoves((items) => items.slice(0, -1));
+            setReviewGameId(null);
+          }}>Undo</button>}
+          {opponent === "local" && moves.length > 0 && <button className="ghost" onClick={() => {
+            setTimedOut(state.turn);
+            void saveForReview(moves, "1/2-1/2", "agreed draw");
+          }}>Agree draw</button>}
+          <button className="ghost" onClick={() => {
+            const loser = state.turn;
+            const result = loser === "white" ? "0-1" : "1-0";
+            setTimedOut(loser);
+            if (moves.length > 0) void saveForReview(moves, result, "resignation");
+          }}>Resign</button>
+        </div>}
+        {state && (state.game_over || timedOut) && <button className="ghost" onClick={() => void start()}>Rematch</button>}
       </aside>
     </section>
   </main>;
