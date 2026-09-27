@@ -25,6 +25,8 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   String _opponent = 'engine';
   String _playerColor = 'white';
   double _level = 8;
+  double _elo = 1600;
+  final List<Map<String, dynamic>> _history = [];
   int _clockIndex = 2;
   Map<String, dynamic>? _state;
   final List<String> _moves = [];
@@ -82,6 +84,8 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           'opponent': _opponent,
           'player_color': _playerColor,
           'level': _level.round(),
+          'elo': _elo.round(),
+          'elo': _elo.round(),
           'initial_fen': _fenController.text.trim().isEmpty ? null : _fenController.text.trim(),
         },
       );
@@ -89,6 +93,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       final seconds = _clocks[_clockIndex].seconds;
       setState(() {
         _state = next;
+        _history.clear();
         _moves
           ..clear()
           ..addAll(next['engine_move'] == null ? const [] : [next['engine_move'] as String]);
@@ -106,7 +111,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     }
   }
 
-  Future<void> _saveCompleted(List<String> moves) async {
+  Future<void> _saveCompleted(List<String> moves, {String? resultOverride, String? termination}) async {
     try {
       final result = await ref.read(apiClientProvider).postJson(
         '/play/complete',
@@ -116,6 +121,9 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           'player_color': _playerColor,
           'opponent': _opponent,
           'level': _level.round(),
+          'elo': _elo.round(),
+          'result_override': resultOverride,
+          'termination': termination,
           'time_control': _clocks[_clockIndex].value,
         },
       );
@@ -147,6 +155,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
         },
       );
       final next = Map<String, dynamic>.from(result as Map);
+      _history.add(Map<String, dynamic>.from(current));
       final added = <String>[uci];
       if (next['engine_move'] != null) added.add(next['engine_move'] as String);
       final nextMoves = <String>[..._moves, ...added];
@@ -241,18 +250,18 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
         const SizedBox(height: 12),
         Row(
           children: [
-            const Text('Engine strength'),
+            const Text('Engine ELO'),
             Expanded(
               child: Slider(
-                value: _level,
-                min: 1,
-                max: 20,
-                divisions: 19,
-                label: _level.round().toString(),
-                onChanged: _opponent == 'engine' ? (value) => setState(() => _level = value) : null,
+                value: _elo,
+                min: 800,
+                max: 2800,
+                divisions: 20,
+                label: _elo.round().toString(),
+                onChanged: _opponent == 'engine' ? (value) => setState(() => _elo = value) : null,
               ),
             ),
-            Text('${_level.round()}/20'),
+            Text('${_elo.round()}'),
           ],
         ),
         TextField(
@@ -300,13 +309,62 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           ),
           if (!gameOver && _timedOut == null) ...[
             const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () {
-                _timer?.cancel();
-                setState(() => _timedOut = state['turn'] as String);
-              },
-              icon: const Icon(Icons.flag_outlined),
-              label: const Text('Resign'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (_opponent == 'local' && _history.isNotEmpty)
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      final previous = _history.removeLast();
+                      setState(() {
+                        _state = previous;
+                        if (_moves.isNotEmpty) _moves.removeLast();
+                      });
+                    },
+                    icon: const Icon(Icons.undo),
+                    label: const Text('Undo'),
+                  ),
+                if (_opponent == 'local' && _moves.isNotEmpty)
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      _timer?.cancel();
+                      setState(() => _timedOut = 'draw');
+                      _saveCompleted(
+                        List<String>.from(_moves),
+                        resultOverride: '1/2-1/2',
+                        termination: 'agreed draw',
+                      );
+                    },
+                    icon: const Icon(Icons.handshake_outlined),
+                    label: const Text('Agree draw'),
+                  ),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    final loser = state['turn'] as String;
+                    final result = loser == 'white' ? '0-1' : '1-0';
+                    _timer?.cancel();
+                    setState(() => _timedOut = loser);
+                    if (_moves.isNotEmpty) {
+                      _saveCompleted(
+                        List<String>.from(_moves),
+                        resultOverride: result,
+                        termination: 'resignation',
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.flag_outlined),
+                  label: const Text('Resign'),
+                ),
+              ],
+            ),
+          ],
+          if (gameOver || _timedOut != null) ...[
+            const SizedBox(height: 8),
+            FilledButton.tonalIcon(
+              onPressed: _busy ? null : _start,
+              icon: const Icon(Icons.replay),
+              label: const Text('Rematch'),
             ),
           ],
           if (_savedGameId != null) ...[
