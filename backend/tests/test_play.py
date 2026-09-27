@@ -2,7 +2,7 @@ import chess
 import pytest
 from fastapi import HTTPException
 
-from app.api.play import PlayCompleteRequest, _apply_uci, _build_pgn, _state
+from app.api.play import PlayCompleteRequest, _apply_uci, _build_pgn, _state, _style_score, _training_challenge
 
 
 def test_apply_uci_and_state_expose_legal_moves():
@@ -49,3 +49,28 @@ def test_build_pgn_accepts_explicit_resignation_result():
     pgn = _build_pgn(payload)
     assert '[Result "0-1"]' in pgn
     assert '[Termination "resignation"]' in pgn
+
+
+def test_training_challenge_guides_opening_development():
+    challenge = _training_challenge(chess.Board())
+    assert challenge is not None
+    assert challenge["kind"] == "development"
+
+
+def test_aggressive_style_prefers_forcing_features():
+    board = chess.Board("4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1")
+    quiet = chess.Move.from_uci("e2e3")
+    checking = chess.Move.from_uci("e2e7")
+    assert _style_score(board, checking, "aggressive") > _style_score(board, quiet, "aggressive")
+
+
+def test_pgn_records_engine_persona():
+    payload = PlayCompleteRequest(
+        moves=["e2e4", "e7e5"],
+        player_color="white",
+        style="positional",
+        difficulty="advanced",
+    )
+    pgn = _build_pgn(payload)
+    assert '[EngineStyle "positional"]' in pgn
+    assert '[EngineDifficulty "advanced"]' in pgn
