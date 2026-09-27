@@ -1,7 +1,7 @@
 name: chesscoach_mobile
 description: ChessCoach AI mobile client
 publish_to: none
-version: 0.9.0+9
+version: 0.11.0+11
 environment:
   sdk: '>=3.4.0 <4.0.0'
 dependencies:
@@ -20,3 +20,5 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 flutter:
   uses-material-design: true
+  assets:
+    - assets/brand/app_icon.png

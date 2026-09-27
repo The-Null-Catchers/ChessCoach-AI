@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_providers.dart';
 import 'features/auth/auth_controller.dart';
+import 'features/auth/branded_splash_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/home_shell.dart';
 
@@ -60,9 +61,7 @@ class _AuthGate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
     if (auth.bootstrapping) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const BrandedSplashScreen();
     }
     return auth.signedIn ? const HomeShell() : const LoginScreen();
   }
