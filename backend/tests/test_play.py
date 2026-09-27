@@ -59,7 +59,7 @@ def test_training_challenge_guides_opening_development():
 
 def test_aggressive_style_prefers_forcing_features():
     board = chess.Board("4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1")
-    quiet = chess.Move.from_uci("e2e3")
+    quiet = chess.Move.from_uci("e2a2")
     checking = chess.Move.from_uci("e2e7")
     assert _style_score(board, checking, "aggressive") > _style_score(board, quiet, "aggressive")
 
