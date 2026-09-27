@@ -24,7 +24,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   final _fenController = TextEditingController();
   String _opponent = 'engine';
   String _playerColor = 'white';
-  double _level = 8;
+  final double _level = 8;
   double _elo = 1600;
   final List<Map<String, dynamic>> _history = [];
   int _clockIndex = 2;
