@@ -121,7 +121,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       TextButton(
                         onPressed: auth.loading
                             ? null
-                            : () => setState(() => _register = !_register),
+                            : () {
+                                ref.read(authControllerProvider.notifier).clearError();
+                                setState(() => _register = !_register);
+                              },
                         child: Text(
                           _register
                               ? 'Already have an account? Sign in'

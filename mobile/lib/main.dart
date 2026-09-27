@@ -59,7 +59,7 @@ class _AuthGate extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
-    if (auth.loading) {
+    if (auth.bootstrapping) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );

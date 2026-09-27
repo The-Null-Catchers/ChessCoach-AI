@@ -25,7 +25,9 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   String _opponent = 'engine';
   String _playerColor = 'white';
   final double _level = 8;
-  double _elo = 1600;
+  double _elo = 1400;
+  String _difficulty = 'intermediate';
+  String _style = 'balanced';
   final List<Map<String, dynamic>> _history = [];
   int _clockIndex = 2;
   Map<String, dynamic>? _state;
@@ -85,6 +87,8 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           'player_color': _playerColor,
           'level': _level.round(),
           'elo': _elo.round(),
+          'difficulty': _difficulty,
+          'style': _style,
           'initial_fen': _fenController.text.trim().isEmpty ? null : _fenController.text.trim(),
         },
       );
@@ -121,6 +125,8 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           'opponent': _opponent,
           'level': _level.round(),
           'elo': _elo.round(),
+          'difficulty': _difficulty,
+          'style': _style,
           'result_override': resultOverride,
           'termination': termination,
           'time_control': _clocks[_clockIndex].value,
@@ -152,6 +158,8 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           'player_color': _playerColor,
           'level': _level.round(),
           'elo': _elo.round(),
+          'difficulty': _difficulty,
+          'style': _style,
         },
       );
       final next = Map<String, dynamic>.from(result as Map);
@@ -236,6 +244,42 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
               ],
               onSelected: (value) => setState(() => _playerColor = value ?? 'white'),
             ),
+            DropdownMenu<String>(
+              label: const Text('Difficulty'),
+              enabled: _opponent == 'engine',
+              initialSelection: _difficulty,
+              dropdownMenuEntries: const [
+                DropdownMenuEntry(value: 'beginner', label: 'Beginner · 900'),
+                DropdownMenuEntry(value: 'intermediate', label: 'Intermediate · 1400'),
+                DropdownMenuEntry(value: 'advanced', label: 'Advanced · 1900'),
+                DropdownMenuEntry(value: 'master', label: 'Master · 2400'),
+              ],
+              onSelected: (value) {
+                final next = value ?? 'intermediate';
+                const eloByDifficulty = {
+                  'beginner': 900.0,
+                  'intermediate': 1400.0,
+                  'advanced': 1900.0,
+                  'master': 2400.0,
+                };
+                setState(() {
+                  _difficulty = next;
+                  _elo = eloByDifficulty[next] ?? 1400.0;
+                });
+              },
+            ),
+            DropdownMenu<String>(
+              label: const Text('Engine style'),
+              enabled: _opponent == 'engine',
+              initialSelection: _style,
+              dropdownMenuEntries: const [
+                DropdownMenuEntry(value: 'balanced', label: 'Balanced'),
+                DropdownMenuEntry(value: 'aggressive', label: 'Aggressive'),
+                DropdownMenuEntry(value: 'positional', label: 'Positional'),
+                DropdownMenuEntry(value: 'defensive', label: 'Defensive'),
+              ],
+              onSelected: (value) => setState(() => _style = value ?? 'balanced'),
+            ),
             DropdownMenu<int>(
               label: const Text('Clock'),
               initialSelection: _clockIndex,
@@ -298,6 +342,29 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           _ClockTile(label: 'White', value: _clockText(_whiteSeconds), active: state['turn'] == 'white'),
           const SizedBox(height: 12),
           Text(status, style: Theme.of(context).textTheme.titleMedium),
+          if (state['challenge'] is Map) ...[
+            const SizedBox(height: 8),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Builder(
+                  builder: (context) {
+                    final challenge = Map<String, dynamic>.from(state['challenge'] as Map);
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('LIVE CHALLENGE', style: Theme.of(context).textTheme.labelSmall),
+                        const SizedBox(height: 4),
+                        Text('${challenge['title']}', style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 4),
+                        Text('${challenge['hint']}'),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           Wrap(
             spacing: 6,
