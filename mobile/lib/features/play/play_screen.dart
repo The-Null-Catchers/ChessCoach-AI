@@ -51,10 +51,10 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       final turn = _state!['turn'] as String?;
       setState(() {
         if (turn == 'white' && _whiteSeconds != null) {
-          _whiteSeconds = (_whiteSeconds! - 1).clamp(0, 86400);
+          _whiteSeconds = (_whiteSeconds! - 1).clamp(0, 86400).toInt();
           if (_whiteSeconds == 0) _timedOut = 'white';
         } else if (turn == 'black' && _blackSeconds != null) {
-          _blackSeconds = (_blackSeconds! - 1).clamp(0, 86400);
+          _blackSeconds = (_blackSeconds! - 1).clamp(0, 86400).toInt();
           if (_blackSeconds == 0) _timedOut = 'black';
         }
       });
