@@ -1,11 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import admin, analytics, auth, coaching, endgames, features, games, health, jobs, openings, reports, training
+from app.api import admin, analytics, auth, coaching, endgames, features, games, health, jobs, openings, play, reports, training
 from app.core.config import settings
 from app.core.observability import configure_observability
 
-app = FastAPI(title=settings.app_name, version="0.15.0")
+app = FastAPI(title=settings.app_name, version="0.16.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()],
@@ -25,5 +25,6 @@ app.include_router(coaching.router, prefix="/api/v1")
 app.include_router(training.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(openings.router, prefix="/api/v1")
+app.include_router(play.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(endgames.router, prefix="/api/v1")
