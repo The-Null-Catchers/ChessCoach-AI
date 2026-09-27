@@ -83,7 +83,11 @@ services:
     cpus: 0.15
 
   web:
-    build: ./web
+    build:
+      context: ./web
+      args:
+        INTERNAL_API_URL: http://backend:8000
+        NEXT_PUBLIC_API_URL: /api/v1
     restart: unless-stopped
     environment:
       INTERNAL_API_URL: http://backend:8000
