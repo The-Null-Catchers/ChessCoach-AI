@@ -7,7 +7,8 @@ import 'package:chesscoach_mobile/main.dart' as app;
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('registers against the real API and opens the games tab', (tester) async {
+  testWidgets('registers against the real API and opens the games tab',
+      (tester) async {
     await app.main();
     await tester.pumpAndSettle();
 
@@ -15,10 +16,27 @@ void main() {
     await tester.tap(find.text('Need an account? Register'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField).at(0), 'Mobile E2E');
-    await tester.enterText(find.byType(TextField).at(1), 'mobile-e2e@example.com');
-    await tester.enterText(find.byType(TextField).at(2), 'e2e-secure-password');
-    await tester.tap(find.text('Create account'));
+    Future<void> fillField(String label, String value) async {
+      final field = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.labelText == label,
+      );
+      expect(field, findsOneWidget);
+      await tester.ensureVisible(field);
+      await tester.pumpAndSettle();
+      await tester.tap(field);
+      await tester.enterText(field, value);
+    }
+
+    await fillField('Display name', 'Mobile E2E');
+    await fillField('Email', 'mobile-e2e@example.com');
+    await fillField('Password', 'e2e-secure-password');
+
+    final createAccount = find.text('Create account');
+    await tester.ensureVisible(createAccount);
+    await tester.pumpAndSettle();
+    await tester.tap(createAccount);
 
     final deadline = DateTime.now().add(const Duration(seconds: 30));
     while (find.text('ChessCoach AI').evaluate().isEmpty &&
@@ -32,17 +50,24 @@ void main() {
           .map((element) => (element.widget as Text).data)
           .whereType<String>()
           .join(' | ');
-      fail('Registration did not reach the authenticated shell. Visible text: $visibleText');
+      fail(
+        'Registration did not reach the authenticated shell. '
+        'Visible text: $visibleText',
+      );
     }
 
     expect(find.text('ChessCoach AI'), findsOneWidget);
     expect(find.text('Coach'), findsWidgets);
 
-    await tester.tap(find.text('Games').last);
+    final games = find.text('Games').last;
+    await tester.ensureVisible(games);
+    await tester.tap(games);
     await tester.pumpAndSettle(const Duration(seconds: 3));
 
     expect(
-      find.text('No games yet. Import PGN games from the web client to start building your coaching history.'),
+      find.text(
+        'No games yet. Import PGN games from the web client to start building your coaching history.',
+      ),
       findsOneWidget,
     );
 
