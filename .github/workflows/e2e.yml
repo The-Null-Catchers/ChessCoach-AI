@@ -157,6 +157,7 @@ jobs:
         working-directory: mobile
         run: |
           flutter create . --platforms=android --org ai.chesscoach
+          python tool/configure_branding.py
           flutter pub get
           python - <<'PY'
           from pathlib import Path
