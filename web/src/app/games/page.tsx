@@ -11,20 +11,23 @@ type Game = {
   variation: string | null;
   analyzed: boolean;
   player_color: "white" | "black" | null;
+  source: string;
 };
 
 export default function GamesPage() {
   const [games, setGames] = useState<Game[]>([]);
   const [message, setMessage] = useState("Loading games…");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "play">("all");
 
-  async function loadGames() {
+  async function loadGames(source: "all" | "play" = sourceFilter) {
     const token = window.localStorage.getItem("chesscoach_access_token");
     if (!token) {
       setMessage("Sign in first to view your games.");
       return;
     }
     const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
-    const response = await fetch(base + "/games", { headers: { Authorization: "Bearer " + token } });
+    const suffix = source === "play" ? "?source=play" : "";
+    const response = await fetch(base + "/games" + suffix, { headers: { Authorization: "Bearer " + token } });
     if (!response.ok) {
       setMessage("Could not load games.");
       return;
@@ -34,7 +37,7 @@ export default function GamesPage() {
     setMessage(rows.length ? "" : "No games imported yet.");
   }
 
-  useEffect(() => { void loadGames(); }, []);
+  useEffect(() => { void loadGames(sourceFilter); }, [sourceFilter]);
 
   async function identify(gameId: string, color: "white" | "black") {
     const token = window.localStorage.getItem("chesscoach_access_token");
@@ -54,12 +57,12 @@ export default function GamesPage() {
   }
 
   return <main><div className="review-shell">
-    <div className="section-heading"><div><p className="eyebrow">YOUR GAMES</p><h1>Game library</h1></div><a href="/import">Import PGN</a></div>
+    <div className="section-heading"><div><p className="eyebrow">YOUR GAMES</p><h1>Game library</h1></div><div className="identify-actions"><button className={sourceFilter === "all" ? "" : "ghost"} onClick={() => setSourceFilter("all")}>All games</button><button className={sourceFilter === "play" ? "" : "ghost"} onClick={() => setSourceFilter("play")}>Played here</button><a href="/import">Import PGN</a></div></div>
     {message && <p>{message}</p>}
     <div className="game-list">{games.map((game) => <div className="game-row" key={game.id}>
       <div>
         <a className="game-title" href={"/games/" + game.id}><b>{game.white ?? "White"} vs {game.black ?? "Black"}</b></a>
-        <span>{game.opening ?? "Opening not identified"}{game.variation ? " · " + game.variation : ""}</span>
+        <span>{game.source === "play" ? "Play & Learn · " : ""}{game.opening ?? "Opening not identified"}{game.variation ? " · " + game.variation : ""}</span>
         {!game.player_color && <div className="identify-actions">
           <small>Which side did you play?</small>
           <button onClick={() => void identify(game.id, "white")}>I played White</button>
