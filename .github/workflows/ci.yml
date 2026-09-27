@@ -75,6 +75,9 @@ jobs:
           channel: stable
       - working-directory: mobile
         run: flutter create . --platforms=android --org ai.chesscoach
+      - name: Apply ChessCoach AI branding
+        working-directory: mobile
+        run: python tool/configure_branding.py
       - name: Smoke-test Android release signing setup
         working-directory: mobile
         shell: bash
