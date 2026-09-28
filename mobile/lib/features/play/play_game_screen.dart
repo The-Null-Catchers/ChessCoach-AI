@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show FontFeature;
 
 import 'package:chess/chess.dart' as chess;
 import 'package:flutter/material.dart';
