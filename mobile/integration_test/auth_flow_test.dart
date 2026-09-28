@@ -13,15 +13,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Welcome back'), findsOneWidget);
-    await tester.tap(find.text('Need an account? Register'));
+
+    final modeToggle = find.byKey(const ValueKey('auth-mode-toggle'));
+    expect(modeToggle, findsOneWidget);
+    await tester.ensureVisible(modeToggle);
+    await tester.pumpAndSettle();
+    await tester.tap(modeToggle);
     await tester.pumpAndSettle();
 
-    Future<void> fillField(String label, String value) async {
-      final field = find.byWidgetPredicate(
-        (widget) =>
-            widget is TextField &&
-            widget.decoration?.labelText == label,
-      );
+    expect(find.text('Create your coach profile'), findsOneWidget);
+
+    Future<void> fillField(String key, String value) async {
+      final field = find.byKey(ValueKey(key));
       expect(field, findsOneWidget);
       await tester.ensureVisible(field);
       await tester.pumpAndSettle();
@@ -29,20 +32,22 @@ void main() {
       await tester.enterText(field, value);
     }
 
-    await fillField('Display name', 'Mobile E2E');
-    await fillField('Email', 'mobile-e2e@example.com');
-    await fillField('Password', 'e2e-secure-password');
+    await fillField('auth-display-name', 'Mobile E2E');
+    await fillField('auth-email', 'mobile-e2e@example.com');
+    await fillField('auth-password', 'e2e-secure-password');
 
-    final createAccount = find.text('Create account');
-    await tester.ensureVisible(createAccount);
+    final submit = find.byKey(const ValueKey('auth-submit'));
+    expect(submit, findsOneWidget);
+    await tester.ensureVisible(submit);
     await tester.pumpAndSettle();
-    await tester.tap(createAccount);
+    await tester.tap(submit);
 
     final deadline = DateTime.now().add(const Duration(seconds: 30));
     while (find.text('ChessCoach AI').evaluate().isEmpty &&
         DateTime.now().isBefore(deadline)) {
       await tester.pump(const Duration(milliseconds: 500));
     }
+
     if (find.text('ChessCoach AI').evaluate().isEmpty) {
       final visibleText = find
           .byType(Text)
