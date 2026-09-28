@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:chess/chess.dart' as chess;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app_providers.dart';
@@ -381,6 +382,22 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
         title: const Text('Game'),
         actions: [
           IconButton(
+            tooltip: 'Copy FEN',
+            onPressed: () async {
+              await Clipboard.setData(
+                ClipboardData(text: _state['fen'] as String),
+              );
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Current position copied as FEN.'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            icon: const Icon(Icons.content_copy_outlined),
+          ),
+          IconButton(
             tooltip: 'Flip board',
             onPressed: () => setState(() => _boardFlipped = !_boardFlipped),
             icon: const Icon(Icons.swap_vert),
@@ -508,6 +525,44 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Text(_message!),
+                ),
+              ),
+            ],
+            if (gameOver || _timedOut != null) ...[
+              const SizedBox(height: 10),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _state['result'] == '1/2-1/2' || _timedOut == 'draw'
+                            ? Icons.handshake_outlined
+                            : Icons.emoji_events_outlined,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Game finished',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _timedOut == 'draw'
+                                  ? 'Draw by agreement'
+                                  : _timedOut != null
+                                      ? '${_timedOut == 'white' ? 'Black' : 'White'} wins on time'
+                                      : 'Result: ${_state['result'] ?? '*'}'
+                                          '${_state['termination'] == null ? '' : ' · ${_state['termination']}'}',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
