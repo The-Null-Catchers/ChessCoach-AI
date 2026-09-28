@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../widgets/chesscoach_brand_mark.dart';
 import 'auth_controller.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -56,13 +57,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     children: [
                       Row(
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: Image.asset(
-                              'assets/brand/app_icon.png',
-                              width: 48,
-                              height: 48,
-                            ),
+                          const ChessCoachBrandMark(
+                            key: ValueKey('auth-brand-mark'),
+                            size: 48,
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -104,6 +101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: 24),
                       if (_register)
                         TextField(
+                          key: const ValueKey('auth-display-name'),
                           controller: _displayName,
                           textInputAction: TextInputAction.next,
                           decoration:
@@ -111,6 +109,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       if (_register) const SizedBox(height: 12),
                       TextField(
+                        key: const ValueKey('auth-email'),
                         controller: _email,
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
@@ -119,6 +118,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(height: 12),
                       TextField(
+                        key: const ValueKey('auth-password'),
                         controller: _password,
                         obscureText: true,
                         onSubmitted: (_) => _submit(),
@@ -138,6 +138,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ],
                       const SizedBox(height: 20),
                       FilledButton(
+                        key: const ValueKey('auth-submit'),
                         onPressed: auth.loading ? null : _submit,
                         child: auth.loading
                             ? const SizedBox.square(
@@ -148,6 +149,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             : Text(_register ? 'Create account' : 'Sign in'),
                       ),
                       TextButton(
+                        key: const ValueKey('auth-mode-toggle'),
                         onPressed: auth.loading
                             ? null
                             : () {
