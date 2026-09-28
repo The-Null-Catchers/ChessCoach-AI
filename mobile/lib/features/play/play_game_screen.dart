@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show FontFeature;
 
 import 'package:chess/chess.dart' as chess;
 import 'package:flutter/material.dart';
@@ -31,6 +32,7 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
   bool _opponentThinking = false;
   bool _showHint = false;
   bool _startingRematch = false;
+  bool _boardFlipped = false;
   String? _message;
   String? _savedGameId;
   String? _timedOut;
@@ -68,6 +70,46 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
     _requestInFlight = false;
     _opponentThinking = false;
     _showHint = false;
+    _boardFlipped = false;
+  }
+
+  Future<void> _resign() async {
+    if (_requestInFlight || _state['game_over'] == true || _timedOut != null) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Resign game?'),
+        content: const Text(
+          'This will finish the game and save the result for coaching analysis.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep playing'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Resign'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final loser = _state['turn'] as String;
+    final result = loser == 'white' ? '0-1' : '1-0';
+    _timer?.cancel();
+    setState(() => _timedOut = loser);
+    if (_moves.isNotEmpty) {
+      await _saveCompleted(
+        List<String>.from(_moves),
+        resultOverride: result,
+        termination: 'resignation',
+      );
+    }
   }
 
   void _startClock() {
@@ -340,6 +382,11 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
         title: const Text('Game'),
         actions: [
           IconButton(
+            tooltip: 'Flip board',
+            onPressed: () => setState(() => _boardFlipped = !_boardFlipped),
+            icon: const Icon(Icons.swap_vert),
+          ),
+          IconButton(
             tooltip: 'Game setup',
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.tune),
@@ -367,8 +414,11 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
                 child: ChessPositionBoard(
                   fen: _state['fen'] as String,
                   enabled: _canMove,
-                  whiteAtBottom: widget.config.opponent == 'local' ||
-                      widget.config.playerColor == 'white',
+                  whiteAtBottom: _boardFlipped
+                      ? !(widget.config.opponent == 'local' ||
+                          widget.config.playerColor == 'white')
+                      : widget.config.opponent == 'local' ||
+                          widget.config.playerColor == 'white',
                   lastMoveUci: _moves.isEmpty ? null : _moves.last,
                   onMove: _move,
                 ),
@@ -462,14 +512,41 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
               ),
             ],
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (var i = 0; i < _moves.length; i++)
-                  Chip(label: Text('${i + 1}. ${_moves[i]}')),
-              ],
-            ),
+            if (_moves.isNotEmpty)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'MOVES',
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 8,
+                        children: [
+                          for (var i = 0; i < _moves.length; i += 2)
+                            Text(
+                              '${(i ~/ 2) + 1}. ${_moves[i]}'
+                              '${i + 1 < _moves.length ? '  ${_moves[i + 1]}' : ''}',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             if (!gameOver && _timedOut == null) ...[
               const SizedBox(height: 12),
               Wrap(
@@ -507,22 +584,7 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
                       label: const Text('Agree draw'),
                     ),
                   OutlinedButton.icon(
-                    onPressed: _requestInFlight
-                        ? null
-                        : () {
-                            final loser = _state['turn'] as String;
-                            final result =
-                                loser == 'white' ? '0-1' : '1-0';
-                            _timer?.cancel();
-                            setState(() => _timedOut = loser);
-                            if (_moves.isNotEmpty) {
-                              _saveCompleted(
-                                List<String>.from(_moves),
-                                resultOverride: result,
-                                termination: 'resignation',
-                              );
-                            }
-                          },
+                    onPressed: _requestInFlight ? null : _resign,
                     icon: const Icon(Icons.flag_outlined),
                     label: const Text('Resign'),
                   ),
