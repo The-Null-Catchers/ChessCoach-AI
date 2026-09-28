@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/chesscoach_brand_mark.dart';
+
 class BrandedSplashScreen extends StatelessWidget {
   const BrandedSplashScreen({super.key});
 
@@ -14,13 +16,8 @@ class BrandedSplashScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 112,
-                  height: 112,
-                  padding: const EdgeInsets.all(10),
+                DecoratedBox(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(28),
-                    color: scheme.surfaceContainerHighest,
                     boxShadow: [
                       BoxShadow(
                         blurRadius: 28,
@@ -29,12 +26,9 @@ class BrandedSplashScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(22),
-                    child: Image.asset(
-                      'assets/brand/app_icon.png',
-                      fit: BoxFit.cover,
-                    ),
+                  child: const ChessCoachBrandMark(
+                    key: ValueKey('splash-brand-mark'),
+                    size: 112,
                   ),
                 ),
                 const SizedBox(height: 24),
