@@ -306,21 +306,41 @@ class _ChessPositionBoardState extends State<ChessPositionBoard> {
                     final pieceWidget = Semantics(
                       label: piece == null ? square : '$square $piece',
                       child: Center(
-                        child: Text(
-                          piece == null ? '' : _pieceGlyph(piece),
-                          style: TextStyle(
-                            fontSize: squareSize * 0.72,
-                            height: 1,
-                            color: piece != null && _isWhitePiece(piece)
-                                ? const Color(0xFFF7F7F0)
-                                : const Color(0xFF171A17),
-                            shadows: const [
-                              Shadow(
-                                blurRadius: 1.5,
-                                color: Color(0x66000000),
-                                offset: Offset(0, 1),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          switchInCurve: Curves.easeOutBack,
+                          switchOutCurve: Curves.easeIn,
+                          transitionBuilder: (child, animation) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: ScaleTransition(
+                                scale: Tween<double>(
+                                  begin: 0.82,
+                                  end: 1,
+                                ).animate(animation),
+                                child: child,
                               ),
-                            ],
+                            );
+                          },
+                          child: Text(
+                            piece == null ? '' : _pieceGlyph(piece),
+                            key: ValueKey<String>(
+                              '$square-${piece ?? 'empty'}',
+                            ),
+                            style: TextStyle(
+                              fontSize: squareSize * 0.72,
+                              height: 1,
+                              color: piece != null && _isWhitePiece(piece)
+                                  ? const Color(0xFFF7F7F0)
+                                  : const Color(0xFF171A17),
+                              shadows: const [
+                                Shadow(
+                                  blurRadius: 1.5,
+                                  color: Color(0x66000000),
+                                  offset: Offset(0, 1),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
