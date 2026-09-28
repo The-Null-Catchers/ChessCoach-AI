@@ -358,7 +358,7 @@ class _ChessPositionBoardState extends State<ChessPositionBoard>
                             ? const SizedBox.shrink()
                             : ChessPieceArt(
                                 key: ValueKey<String>(
-                                  "$square-${piece}",
+                                  "$square-$piece",
                                 ),
                                 piece: piece,
                                 size: squareSize * 0.88,
