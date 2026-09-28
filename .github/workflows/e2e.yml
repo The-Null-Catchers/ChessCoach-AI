@@ -197,7 +197,7 @@ jobs:
   mobile-e2e:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 35
     services:
       postgres:
         image: postgres:17-alpine
@@ -278,13 +278,13 @@ jobs:
       - name: Run full Android integration test
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 33
           arch: x86_64
-          profile: pixel_4
+          profile: pixel_2
           cores: 2
           ram-size: 4096M
           heap-size: 512M
-          emulator-boot-timeout: 900
+          emulator-boot-timeout: 600
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
           script: adb -s emulator-5554 reverse tcp:8000 tcp:8000 && cd mobile && flutter test integration_test/auth_flow_test.dart -d emulator-5554 --dart-define=API_URL=http://127.0.0.1:8000/api/v1
