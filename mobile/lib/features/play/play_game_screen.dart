@@ -73,6 +73,38 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
     _boardFlipped = false;
   }
 
+  Future<bool> _confirmLeaveActiveGame() async {
+    if (_state['game_over'] == true || _timedOut != null || _moves.isEmpty) {
+      return true;
+    }
+
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Leave this game?'),
+        content: const Text(
+          'Your current game is still in progress. Leaving now will discard the unsaved position.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Stay'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Leave game'),
+          ),
+        ],
+      ),
+    );
+    return leave == true;
+  }
+
+  Future<void> _leaveGame() async {
+    if (!await _confirmLeaveActiveGame() || !mounted) return;
+    Navigator.of(context).pop();
+  }
+
   Future<void> _resign() async {
     if (_requestInFlight || _state['game_over'] == true || _timedOut != null) {
       return;
@@ -228,6 +260,8 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
     final localMoves = <String>[...movesBefore, uci];
     final increment = widget.config.increment;
 
+    HapticFeedback.selectionClick();
+
     setState(() {
       _history.add(current);
       _state = localState;
@@ -275,6 +309,9 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
         }
       }
       if (!mounted) return;
+      if (engineMove != null) {
+        HapticFeedback.lightImpact();
+      }
 
       final nextMoves = <String>[
         ...localMoves,
@@ -377,7 +414,18 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
                     ? 'Game over · ${_state['result'] ?? '*'}'
                     : '${_state['check'] == true ? 'Check · ' : ''}${_state['turn']} to move';
 
-    return Scaffold(
+    final hasActiveGame =
+        !gameOver && _timedOut == null && _moves.isNotEmpty;
+
+    return PopScope(
+      canPop: !hasActiveGame,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        if (await _confirmLeaveActiveGame() && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Game'),
         actions: [
@@ -404,7 +452,7 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
           ),
           IconButton(
             tooltip: 'Game setup',
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: _leaveGame,
             icon: const Icon(Icons.tune),
           ),
         ],
@@ -645,6 +693,33 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
                             ),
                         ],
                       ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Text(
+                            '${(_moves.length + 1) ~/ 2} move'
+                            '${((_moves.length + 1) ~/ 2) == 1 ? '' : 's'}',
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                          const Spacer(),
+                          TextButton.icon(
+                            onPressed: () async {
+                              await Clipboard.setData(
+                                ClipboardData(text: _moves.join(' ')),
+                              );
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Move list copied.'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.copy_all_outlined, size: 18),
+                            label: const Text('Copy moves'),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -707,7 +782,7 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: _leaveGame,
                 icon: const Icon(Icons.tune),
                 label: const Text('Change game settings'),
               ),
@@ -721,6 +796,7 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 }
