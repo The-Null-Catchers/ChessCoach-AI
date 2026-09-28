@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:chess/chess.dart' as chess;
 import 'package:flutter/material.dart';
 
+import 'chess_piece_art.dart';
+
 typedef ChessMoveCallback = Future<void> Function(String uci);
 
 class ChessBoardArrow {
@@ -67,24 +69,6 @@ List<String> orientedSquares({required bool whiteAtBottom}) {
 
 bool _isWhitePiece(String piece) => piece == piece.toUpperCase();
 
-String _pieceGlyph(String piece) {
-  const glyphs = <String, String>{
-    'K': '♔',
-    'Q': '♕',
-    'R': '♖',
-    'B': '♗',
-    'N': '♘',
-    'P': '♙',
-    'k': '♚',
-    'q': '♛',
-    'r': '♜',
-    'b': '♝',
-    'n': '♞',
-    'p': '♟',
-  };
-  return glyphs[piece] ?? '';
-}
-
 class ChessPositionBoard extends StatefulWidget {
   const ChessPositionBoard({
     required this.fen,
@@ -107,24 +91,73 @@ class ChessPositionBoard extends StatefulWidget {
   State<ChessPositionBoard> createState() => _ChessPositionBoardState();
 }
 
-class _ChessPositionBoardState extends State<ChessPositionBoard> {
+class _ChessPositionBoardState extends State<ChessPositionBoard>
+    with SingleTickerProviderStateMixin {
   late chess.Chess _game;
   String? _selectedSquare;
   Set<String> _legalTargets = const {};
   bool _submitting = false;
+  late final AnimationController _moveController;
+  String? _moveFrom;
+  String? _moveTo;
+  String? _movingPiece;
+  String? _capturedPiece;
 
   @override
   void initState() {
     super.initState();
+    _moveController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 240),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() {
+            _moveFrom = null;
+            _moveTo = null;
+            _movingPiece = null;
+            _capturedPiece = null;
+          });
+        }
+      });
     _loadFen();
+  }
+
+  @override
+  void dispose() {
+    _moveController.dispose();
+    super.dispose();
   }
 
   @override
   void didUpdateWidget(covariant ChessPositionBoard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.fen != widget.fen) {
+      _prepareMoveAnimation(oldWidget.fen);
       _loadFen();
     }
+  }
+
+  void _prepareMoveAnimation(String previousFen) {
+    final lastMove = widget.lastMoveUci;
+    if (lastMove == null || lastMove.length < 4) {
+      _moveFrom = null;
+      _moveTo = null;
+      _movingPiece = null;
+      _capturedPiece = null;
+      return;
+    }
+
+    final oldPieces = parseFenPieces(previousFen);
+    final from = lastMove.substring(0, 2);
+    final to = lastMove.substring(2, 4);
+    final piece = oldPieces[from];
+    if (piece == null) return;
+
+    _moveFrom = from;
+    _moveTo = to;
+    _movingPiece = piece;
+    _capturedPiece = oldPieces[to];
+    _moveController.forward(from: 0);
   }
 
   void _loadFen() {
@@ -251,6 +284,18 @@ class _ChessPositionBoardState extends State<ChessPositionBoard> {
     });
   }
 
+  Offset _squareTopLeft(
+    String square,
+    double cell, {
+    required bool whiteAtBottom,
+  }) {
+    final file = square.codeUnitAt(0) - 'a'.codeUnitAt(0);
+    final rank = int.parse(square[1]);
+    final col = whiteAtBottom ? file : 7 - file;
+    final row = whiteAtBottom ? 8 - rank : rank - 1;
+    return Offset(col * cell, row * cell);
+  }
+
   @override
   Widget build(BuildContext context) {
     final pieces = parseFenPieces(_game.fen);
@@ -303,46 +348,22 @@ class _ChessPositionBoardState extends State<ChessPositionBoard> {
                     final legal = _legalTargets.contains(square);
                     final canDrag = _pieceCanMove(square, piece);
 
+                    final hideForMove = _moveController.isAnimating &&
+                        square == _moveTo &&
+                        _movingPiece != null;
                     final pieceWidget = Semantics(
                       label: piece == null ? square : '$square $piece',
                       child: Center(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 180),
-                          switchInCurve: Curves.easeOutBack,
-                          switchOutCurve: Curves.easeIn,
-                          transitionBuilder: (child, animation) {
-                            return FadeTransition(
-                              opacity: animation,
-                              child: ScaleTransition(
-                                scale: Tween<double>(
-                                  begin: 0.82,
-                                  end: 1,
-                                ).animate(animation),
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: Text(
-                            piece == null ? '' : _pieceGlyph(piece),
-                            key: ValueKey<String>(
-                              "$square-${piece ?? 'empty'}",
-                            ),
-                            style: TextStyle(
-                              fontSize: squareSize * 0.72,
-                              height: 1,
-                              color: piece != null && _isWhitePiece(piece)
-                                  ? const Color(0xFFF7F7F0)
-                                  : const Color(0xFF171A17),
-                              shadows: const [
-                                Shadow(
-                                  blurRadius: 1.5,
-                                  color: Color(0x66000000),
-                                  offset: Offset(0, 1),
+                        child: piece == null || hideForMove
+                            ? const SizedBox.shrink()
+                            : ChessPieceArt(
+                                key: ValueKey<String>(
+                                  "$square-${piece}",
                                 ),
-                              ],
-                            ),
-                          ),
-                        ),
+                                piece: piece,
+                                size: squareSize * 0.88,
+                                selected: selected,
+                              ),
                       ),
                     );
 
@@ -453,6 +474,83 @@ class _ChessPositionBoardState extends State<ChessPositionBoard> {
                     );
                   },
                 ),
+                if (_capturedPiece != null &&
+                    _moveTo != null &&
+                    _moveController.isAnimating)
+                  AnimatedBuilder(
+                    animation: _moveController,
+                    builder: (context, child) {
+                      final target = _squareTopLeft(
+                        _moveTo!,
+                        squareSize,
+                        whiteAtBottom: widget.whiteAtBottom,
+                      );
+                      final t = Curves.easeOut.transform(
+                        _moveController.value,
+                      );
+                      return Positioned(
+                        left: target.dx,
+                        top: target.dy,
+                        width: squareSize,
+                        height: squareSize,
+                        child: IgnorePointer(
+                          child: Opacity(
+                            opacity: 1 - t,
+                            child: Transform.scale(
+                              scale: 1 - (0.18 * t),
+                              child: Center(
+                                child: ChessPieceArt(
+                                  piece: _capturedPiece!,
+                                  size: squareSize * 0.88,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                if (_movingPiece != null &&
+                    _moveFrom != null &&
+                    _moveTo != null &&
+                    _moveController.isAnimating)
+                  AnimatedBuilder(
+                    animation: _moveController,
+                    builder: (context, child) {
+                      final from = _squareTopLeft(
+                        _moveFrom!,
+                        squareSize,
+                        whiteAtBottom: widget.whiteAtBottom,
+                      );
+                      final to = _squareTopLeft(
+                        _moveTo!,
+                        squareSize,
+                        whiteAtBottom: widget.whiteAtBottom,
+                      );
+                      final t = Curves.easeInOutCubic.transform(
+                        _moveController.value,
+                      );
+                      final offset = Offset.lerp(from, to, t)!;
+                      final lift = 1 + (0.08 * math.sin(math.pi * t));
+                      return Positioned(
+                        left: offset.dx,
+                        top: offset.dy,
+                        width: squareSize,
+                        height: squareSize,
+                        child: IgnorePointer(
+                          child: Transform.scale(
+                            scale: lift,
+                            child: Center(
+                              child: ChessPieceArt(
+                                piece: _movingPiece!,
+                                size: squareSize * 0.9,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 IgnorePointer(
                   child: CustomPaint(
                     size: Size.square(size),
