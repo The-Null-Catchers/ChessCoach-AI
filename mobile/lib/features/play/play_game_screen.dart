@@ -410,16 +410,64 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
               child: AspectRatio(
                 key: ValueKey<String>(_state['fen'] as String),
                 aspectRatio: 1,
-                child: ChessPositionBoard(
-                  fen: _state['fen'] as String,
-                  enabled: _canMove,
-                  whiteAtBottom: _boardFlipped
-                      ? !(widget.config.opponent == 'local' ||
-                          widget.config.playerColor == 'white')
-                      : widget.config.opponent == 'local' ||
-                          widget.config.playerColor == 'white',
-                  lastMoveUci: _moves.isEmpty ? null : _moves.last,
-                  onMove: _move,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ChessPositionBoard(
+                      fen: _state['fen'] as String,
+                      enabled: _canMove,
+                      whiteAtBottom: _boardFlipped
+                          ? !(widget.config.opponent == 'local' ||
+                              widget.config.playerColor == 'white')
+                          : widget.config.opponent == 'local' ||
+                              widget.config.playerColor == 'white',
+                      lastMoveUci: _moves.isEmpty ? null : _moves.last,
+                      onMove: _move,
+                    ),
+                    if (_opponentThinking)
+                      IgnorePointer(
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .surface
+                                    .withValues(alpha: 0.9),
+                                borderRadius: BorderRadius.circular(999),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    blurRadius: 10,
+                                    color: Color(0x22000000),
+                                  ),
+                                ],
+                              ),
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 7,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox.square(
+                                      dimension: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('ChessCoach is thinking…'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
