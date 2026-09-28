@@ -468,14 +468,9 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
               thinking: _opponentThinking && _state['turn'] == 'black',
             ),
             const SizedBox(height: 4),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              switchInCurve: Curves.easeOut,
-              switchOutCurve: Curves.easeIn,
-              child: AspectRatio(
-                key: ValueKey<String>(_state['fen'] as String),
-                aspectRatio: 1,
-                child: Stack(
+            AspectRatio(
+              aspectRatio: 1,
+              child: Stack(
                   fit: StackFit.expand,
                   children: [
                     ChessPositionBoard(
@@ -535,7 +530,6 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
                   ],
                 ),
               ),
-            ),
             const SizedBox(height: 4),
             _ClockTile(
               label: 'White',
