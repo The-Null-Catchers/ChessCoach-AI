@@ -325,7 +325,7 @@ class _ChessPositionBoardState extends State<ChessPositionBoard> {
                           child: Text(
                             piece == null ? '' : _pieceGlyph(piece),
                             key: ValueKey<String>(
-                              '$square-${piece ?? 'empty'}',
+                              "$square-${piece ?? 'empty'}",
                             ),
                             style: TextStyle(
                               fontSize: squareSize * 0.72,
