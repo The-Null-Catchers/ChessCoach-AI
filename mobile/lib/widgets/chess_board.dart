@@ -202,6 +202,9 @@ class _ChessPositionBoardState extends State<ChessPositionBoard>
   }
 
   Future<String?> _promotionChoice() {
+    final sideToMoveIsWhite =
+        _game.fen.trim().split(RegExp(r'\\s+')).elementAt(1) == 'w';
+
     return showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -216,9 +219,13 @@ class _ChessPositionBoardState extends State<ChessPositionBoard>
                 'Promote pawn',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
-              const SizedBox(height: 12),
-              Wrap(
-                alignment: WrapAlignment.spaceEvenly,
+              const SizedBox(height: 4),
+              Text(
+                'Choose the piece for your promotion.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              Row(
                 children: [
                   for (final entry in const [
                     ('q', 'Queen'),
@@ -226,9 +233,42 @@ class _ChessPositionBoardState extends State<ChessPositionBoard>
                     ('b', 'Bishop'),
                     ('n', 'Knight'),
                   ])
-                    FilledButton.tonal(
-                      onPressed: () => Navigator.of(context).pop(entry.$1),
-                      child: Text(entry.$2),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(18),
+                          onTap: () => Navigator.of(context).pop(entry.$1),
+                          child: Ink(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ChessPieceArt(
+                                  piece: sideToMoveIsWhite
+                                      ? entry.$1.toUpperCase()
+                                      : entry.$1,
+                                  size: 52,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  entry.$2,
+                                  style: Theme.of(context).textTheme.labelMedium,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -378,7 +418,9 @@ class _ChessPositionBoardState extends State<ChessPositionBoard>
                           onTap: widget.enabled
                               ? () => _selectSquare(square, piece)
                               : null,
-                          child: Container(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 140),
+                            curve: Curves.easeOutCubic,
                             color: selected
                                 ? selectedColor
                                 : isLastMove
@@ -409,16 +451,46 @@ class _ChessPositionBoardState extends State<ChessPositionBoard>
                                   )
                                 else
                                   pieceWidget,
+                                if (selected)
+                                  Center(
+                                    child: IgnorePointer(
+                                      child: Container(
+                                        width: squareSize * 0.84,
+                                        height: squareSize * 0.84,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            width: math.max(
+                                              2,
+                                              squareSize * 0.045,
+                                            ),
+                                            color: colorScheme.onPrimary
+                                                .withValues(alpha: 0.5),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 if (legal)
                                   Center(
-                                    child: Container(
-                                      width: piece == null
-                                          ? squareSize * 0.22
-                                          : squareSize * 0.82,
-                                      height: piece == null
-                                          ? squareSize * 0.22
-                                          : squareSize * 0.82,
-                                      decoration: BoxDecoration(
+                                    child: TweenAnimationBuilder<double>(
+                                      duration: const Duration(milliseconds: 150),
+                                      tween: Tween(begin: 0.7, end: 1),
+                                      curve: Curves.easeOutBack,
+                                      builder: (context, scale, child) {
+                                        return Transform.scale(
+                                          scale: scale,
+                                          child: child,
+                                        );
+                                      },
+                                      child: Container(
+                                        width: piece == null
+                                            ? squareSize * 0.22
+                                            : squareSize * 0.82,
+                                        height: piece == null
+                                            ? squareSize * 0.22
+                                            : squareSize * 0.82,
+                                        decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         color: piece == null
                                             ? colorScheme.onSurface
@@ -431,6 +503,7 @@ class _ChessPositionBoardState extends State<ChessPositionBoard>
                                                 color: colorScheme.onSurface
                                                     .withValues(alpha: 0.22),
                                               ),
+                                        ),
                                       ),
                                     ),
                                   ),
