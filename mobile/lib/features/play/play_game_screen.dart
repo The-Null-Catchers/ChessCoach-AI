@@ -36,6 +36,7 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
   String? _message;
   String? _savedGameId;
   String? _timedOut;
+  String? _localTermination;
   int? _whiteSeconds;
   int? _blackSeconds;
 
@@ -65,6 +66,7 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
     _whiteSeconds = widget.config.clockSeconds;
     _blackSeconds = widget.config.clockSeconds;
     _timedOut = null;
+    _localTermination = null;
     _savedGameId = null;
     _message = null;
     _requestInFlight = false;
@@ -134,7 +136,10 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
     final loser = _state['turn'] as String;
     final result = loser == 'white' ? '0-1' : '1-0';
     _timer?.cancel();
-    setState(() => _timedOut = loser);
+    setState(() {
+      _timedOut = loser;
+      _localTermination = 'resignation';
+    });
     if (_moves.isNotEmpty) {
       await _saveCompleted(
         List<String>.from(_moves),
@@ -153,10 +158,16 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
       setState(() {
         if (turn == 'white' && _whiteSeconds != null) {
           _whiteSeconds = (_whiteSeconds! - 1).clamp(0, 86400).toInt();
-          if (_whiteSeconds == 0) _timedOut = 'white';
+          if (_whiteSeconds == 0) {
+            _timedOut = 'white';
+            _localTermination = 'time forfeit';
+          }
         } else if (turn == 'black' && _blackSeconds != null) {
           _blackSeconds = (_blackSeconds! - 1).clamp(0, 86400).toInt();
-          if (_blackSeconds == 0) _timedOut = 'black';
+          if (_blackSeconds == 0) {
+            _timedOut = 'black';
+            _localTermination = 'time forfeit';
+          }
         }
       });
       if (_timedOut != null) {
@@ -409,7 +420,9 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
         : _timedOut == 'draw'
             ? 'Draw agreed'
             : _timedOut != null
-                ? '${_timedOut == 'white' ? 'White' : 'Black'} ran out of time'
+                ? _localTermination == 'resignation'
+                    ? '${_timedOut == 'white' ? 'Black' : 'White'} wins by resignation'
+                    : '${_timedOut == 'white' ? 'White' : 'Black'} ran out of time'
                 : gameOver
                     ? 'Game over · ${_state['result'] ?? '*'}'
                     : '${_state['check'] == true ? 'Check · ' : ''}${_state['turn']} to move';
@@ -596,7 +609,9 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
                               _timedOut == 'draw'
                                   ? 'Draw by agreement'
                                   : _timedOut != null
-                                      ? '${_timedOut == 'white' ? 'Black' : 'White'} wins on time'
+                                      ? _localTermination == 'resignation'
+                                          ? '${_timedOut == 'white' ? 'Black' : 'White'} wins by resignation'
+                                          : '${_timedOut == 'white' ? 'Black' : 'White'} wins on time'
                                       : 'Result: ${_state['result'] ?? '*'}'
                                           '${_state['termination'] == null ? '' : ' · ${_state['termination']}'}',
                             ),
@@ -744,7 +759,10 @@ class _PlayGameScreenState extends ConsumerState<PlayGameScreen> {
                     OutlinedButton.icon(
                       onPressed: () {
                         _timer?.cancel();
-                        setState(() => _timedOut = 'draw');
+                        setState(() {
+                          _timedOut = 'draw';
+                          _localTermination = 'agreed draw';
+                        });
                         _saveCompleted(
                           List<String>.from(_moves),
                           resultOverride: '1/2-1/2',
