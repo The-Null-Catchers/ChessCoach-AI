@@ -34,10 +34,6 @@ def upgrade():
         ["position_hash", "engine_key", "depth", "multipv"],
     )
 
-    review_columns = {column["name"] for column in inspector.get_columns("review_states")}
-    if "mastery" in review_columns:
-        op.drop_column("review_states", "mastery")
-
     engine_columns = {column["name"] for column in inspector.get_columns("engine_analyses")}
     if "analysis_profile" not in engine_columns:
         op.add_column(
@@ -58,6 +54,10 @@ def upgrade():
 def downgrade():
     bind = op.get_bind()
     inspector = sa.inspect(bind)
+
+    review_columns = {column["name"] for column in inspector.get_columns("review_states")}
+    if "mastery" in review_columns:
+        op.drop_column("review_states", "mastery")
 
     engine_columns = {column["name"] for column in inspector.get_columns("engine_analyses")}
     if "candidate_moves_json" in engine_columns:
