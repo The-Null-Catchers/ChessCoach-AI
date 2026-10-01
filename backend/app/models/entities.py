@@ -360,6 +360,7 @@ class ReviewState(Base):
     interval_days: Mapped[int] = mapped_column(Integer, default=0)
     ease_factor: Mapped[float] = mapped_column(Float, default=2.5)
     lapses: Mapped[int] = mapped_column(Integer, default=0)
+    mastery: Mapped[float] = mapped_column(Float, default=0)
     due_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
