@@ -64,7 +64,7 @@ test("runs the critical coaching loop from PGN import through puzzle mastery", a
 
   await gameLink.click();
   await expect(page.getByText("Analysis complete")).toBeVisible();
-  const blunderMove = page.getByRole("button", { name: /3\. g4/ });
+  const blunderMove = page.locator(".move-list .move-chip").filter({ hasText: "3. g4" });
   await expect(blunderMove).toBeVisible();
   await blunderMove.click();
   await expect(page.locator(".coach-note")).toBeVisible();
