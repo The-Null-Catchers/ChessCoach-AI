@@ -8,8 +8,9 @@ from app.models.entities import Mistake, MistakeCategory, MistakeCategoryLink
 from app.services.semantic_mistakes import SemanticMistake
 
 TACTICAL = {
-    "hanging_piece", "missed_fork", "missed_pin", "missed_check", "missed_forcing_move",
-    "back_rank_weakness", "mating_pattern", "trapped_piece", "overloaded_defender",
+    "hanging_piece", "missed_fork", "missed_pin", "missed_skewer", "missed_discovered_attack",
+    "missed_check", "missed_forcing_move", "back_rank_weakness", "mating_pattern",
+    "trapped_piece", "overloaded_defender", "removal_of_defender",
 }
 OPENING = {"early_queen_activity", "delayed_castling", "poor_piece_development", "opening_theory_mistake"}
 POSITIONAL = {"king_safety", "weak_square", "pawn_structure", "inactive_rook", "bad_bishop", "critical_decision"}
