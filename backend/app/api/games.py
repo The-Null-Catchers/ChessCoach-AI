@@ -9,9 +9,10 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.rate_limit import GAME_IMPORT_LIMIT, REANALYSIS_LIMIT, enforce_rate_limit
 from app.db.session import get_db
-from app.models.entities import Game, GamePlayer, Move, AnalysisJob, EngineAnalysis, User
+from app.models.entities import AnalysisJob, ConnectedAccount, EngineAnalysis, Game, GamePlayer, Move, User
 from app.services.player_identity import link_game_players
 from app.services.pgn import parse_pgn_many
+from app.services.provider_imports import ProviderImportError, fetch_provider_games, normalize_username
 from app.tasks.analysis import analyze_game
 from app.services.stockfish import analysis_profile
 from app.services.player_analytics import accuracy_from_cpl, classify_endgame
@@ -20,6 +21,13 @@ router = APIRouter(prefix='/games', tags=['games'])
 
 class IdentifyPlayerRequest(BaseModel):
     color: Literal["white", "black"]
+
+
+class AccountImportRequest(BaseModel):
+    provider: Literal["lichess", "chesscom"]
+    username: str
+    max_games: int = 20
+    analysis_strength: Literal["quick", "normal", "deep"] = "normal"
 
 def current_user_id(
     authorization: str = Header(...),
@@ -85,6 +93,126 @@ async def import_games(request: Request, pgn_text: str | None = Form(default=Non
         analyze_game.delay(game.id, job.id, selected_profile.name)
         imported.append({'game_id': game.id, 'job_id': job.id, 'duplicate': False})
     return {'count': len(imported), 'games': imported}
+
+@router.post('/import/account', status_code=202)
+async def import_account_games(
+    payload: AccountImportRequest,
+    request: Request,
+    user_id: str = Depends(current_user_id),
+    db: Session = Depends(get_db),
+):
+    enforce_rate_limit(request, GAME_IMPORT_LIMIT, subject=user_id)
+    if not 1 <= payload.max_games <= 50:
+        raise HTTPException(422, 'max_games must be between 1 and 50')
+    try:
+        username = normalize_username(payload.username)
+        selected_profile = analysis_profile(payload.analysis_strength)
+        pgn_text = await fetch_provider_games(
+            payload.provider,
+            username,
+            max_games=payload.max_games,
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except ProviderImportError as exc:
+        raise HTTPException(502, str(exc)) from exc
+
+    parsed = parse_pgn_many(pgn_text)
+    if not parsed:
+        raise HTTPException(422, 'No importable games were returned by the provider')
+
+    account = db.scalar(
+        select(ConnectedAccount).where(
+            ConnectedAccount.provider == payload.provider,
+            ConnectedAccount.provider_user_id == username.lower(),
+        )
+    )
+    if account is not None and account.user_id != user_id:
+        raise HTTPException(409, 'This chess account is already connected to another user')
+    if account is None:
+        account = ConnectedAccount(
+            user_id=user_id,
+            provider=payload.provider,
+            provider_user_id=username.lower(),
+            handle=username,
+        )
+        db.add(account)
+    else:
+        account.handle = username
+
+    imported = []
+    for item in parsed:
+        existing = db.scalar(
+            select(Game).where(
+                Game.user_id == user_id,
+                Game.fingerprint == item.fingerprint,
+            )
+        )
+        if existing:
+            link_game_players(
+                db,
+                game=existing,
+                user_id=user_id,
+                explicit_name=username,
+                white_rating=item.headers.get('WhiteElo'),
+                black_rating=item.headers.get('BlackElo'),
+            )
+            db.commit()
+            imported.append({'game_id': existing.id, 'duplicate': True})
+            continue
+
+        h = item.headers
+        game = Game(
+            user_id=user_id,
+            fingerprint=item.fingerprint,
+            pgn=item.pgn,
+            source=payload.provider,
+            event=h.get('Event'),
+            site=h.get('Site'),
+            white_name=h.get('White'),
+            black_name=h.get('Black'),
+            result=h.get('Result'),
+            eco=h.get('ECO'),
+            opening=h.get('Opening'),
+            variation=h.get('Variation'),
+            time_control=h.get('TimeControl'),
+            played_at=item.played_at,
+        )
+        db.add(game)
+        db.flush()
+        link_game_players(
+            db,
+            game=game,
+            user_id=user_id,
+            explicit_name=username,
+            white_rating=h.get('WhiteElo'),
+            black_rating=h.get('BlackElo'),
+        )
+        for move in item.moves:
+            db.add(
+                Move(
+                    game_id=game.id,
+                    ply=move.ply,
+                    san=move.san,
+                    uci=move.uci,
+                    fen_before=move.fen_before,
+                    fen_after=move.fen_after,
+                    clock_seconds=move.clock_seconds,
+                )
+            )
+        job = AnalysisJob(user_id=user_id, game_id=game.id, status='queued', progress=0)
+        db.add(job)
+        db.commit()
+        analyze_game.delay(game.id, job.id, selected_profile.name)
+        imported.append({'game_id': game.id, 'job_id': job.id, 'duplicate': False})
+
+    return {
+        'provider': payload.provider,
+        'username': username,
+        'count': len(imported),
+        'games': imported,
+    }
+
 
 @router.get('')
 def list_games(
