@@ -11,9 +11,9 @@ The repository now includes the core end-to-end coaching loop rather than a UI-o
 - one-time email verification and password-reset flows with hashed expiring tokens
 - Redis-backed abuse rate limiting for sensitive authentication endpoints
 - multi-game PGN parsing, duplicate detection, player-side identification and clock extraction
-- asynchronous Stockfish analysis through Celery + Redis
+- asynchronous Stockfish analysis through Celery + Redis with persistent worker engines and quick/normal/deep profiles
 - normalized position hashing and cached engine analysis
-- context-aware move classification with mate-aware handling
+- context-aware move classification with mate-aware handling and cached MultiPV candidate lines
 - semantic mistake detection, normalized mistake taxonomy and player-only weakness aggregation
 - deterministic tactical motif detection for hanging pieces, forks and absolute pins
 - time-management themes when clock data is available
@@ -24,7 +24,7 @@ The repository now includes the core end-to-end coaching loop rather than a UI-o
 - analytics for phase accuracy, openings, endgames, weaknesses and evidence-based insights
 - normalized opening repertoire move trees with PGN variation import and spaced-repetition training
 - curated endgame technique trainer with legal-move validation, mastery tracking and spaced repetition
-- Next.js dashboard, auth, import, game library, game review, puzzles, training and analytics
+- Next.js dashboard, auth, import, game library, rich game review with evaluation graph/critical moments/MultiPV, puzzles, training and analytics
 - Flutter/Riverpod app with real API auth, offline caches, queued offline puzzle attempts and dark mode
 - interactive Flutter chessboard with legal moves, tap/drag movement, promotion, board flip and review navigation
 - Docker Compose for PostgreSQL, Redis, API, worker and web
@@ -73,4 +73,10 @@ Register → import PGN → analysis worker processes the game → inspect criti
 
 ## Near-term roadmap
 
-The previously listed product-completeness roadmap is implemented. Remaining work should be driven by deployment evidence, production telemetry and concrete user feedback rather than parallel feature rewrites.
+The core coaching loop is implemented and covered by a real browser E2E flow. Remaining product-completeness work is intentionally focused rather than a rewrite:
+
+- provider-backed Lichess / Chess.com account import adapters
+- broader positional/strategic semantic detectors and historical weakness snapshots
+- push-notification delivery abstraction
+- richer AI/provider usage accounting and operations telemetry
+- seeded portfolio demo data and final screenshot/release presentation polish
