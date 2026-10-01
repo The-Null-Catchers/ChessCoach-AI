@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import jwt
 from typing import Literal
 from pydantic import BaseModel
@@ -12,6 +13,7 @@ from app.models.entities import Game, GamePlayer, Move, AnalysisJob, EngineAnaly
 from app.services.player_identity import link_game_players
 from app.services.pgn import parse_pgn_many
 from app.tasks.analysis import analyze_game
+from app.services.stockfish import analysis_profile
 
 router = APIRouter(prefix='/games', tags=['games'])
 
@@ -43,6 +45,7 @@ def current_user_id(
 @router.post('/import', status_code=202)
 async def import_games(request: Request, pgn_text: str | None = Form(default=None), file: UploadFile | None = File(default=None),
                        player_name: str | None = Form(default=None),
+                       analysis_strength: str = Form(default="normal"),
                        user_id: str = Depends(current_user_id), db: Session = Depends(get_db)):
     enforce_rate_limit(request, GAME_IMPORT_LIMIT, subject=user_id)
     if not pgn_text and not file:
@@ -51,6 +54,10 @@ async def import_games(request: Request, pgn_text: str | None = Form(default=Non
         raw = await file.read(settings.max_pgn_bytes + 1)
         if len(raw) > settings.max_pgn_bytes: raise HTTPException(413, 'PGN too large')
         pgn_text = raw.decode('utf-8', errors='strict')
+    try:
+        selected_profile = analysis_profile(analysis_strength)
+    except ValueError as exc:
+        raise HTTPException(422, 'analysis_strength must be quick, normal, or deep') from exc
     parsed = parse_pgn_many(pgn_text or '')
     if not parsed: raise HTTPException(422, 'No valid games found')
     imported = []
@@ -74,7 +81,7 @@ async def import_games(request: Request, pgn_text: str | None = Form(default=Non
                         fen_after=m.fen_after, clock_seconds=m.clock_seconds))
         job = AnalysisJob(user_id=user_id, game_id=game.id, status='queued', progress=0)
         db.add(job); db.commit()
-        analyze_game.delay(game.id, job.id)
+        analyze_game.delay(game.id, job.id, selected_profile.name)
         imported.append({'game_id': game.id, 'job_id': job.id, 'duplicate': False})
     return {'count': len(imported), 'games': imported}
 
@@ -120,7 +127,9 @@ def game_analysis(game_id: str, user_id: str = Depends(current_user_id), db: Ses
         a = db.scalar(select(EngineAnalysis).where(EngineAnalysis.move_id == m.id))
         out.append({'move_id': m.id, 'ply': m.ply, 'san': m.san, 'uci': m.uci, 'fen_before': m.fen_before, 'fen_after': m.fen_after,
                     'analysis': None if not a else {'before_cp': a.eval_before_cp, 'after_cp': a.eval_after_cp,
-                    'cpl': a.centipawn_loss, 'classification': a.classification, 'best_move': a.best_move_uci, 'pv': a.pv_uci}})
+                    'cpl': a.centipawn_loss, 'classification': a.classification, 'best_move': a.best_move_uci, 'pv': a.pv_uci,
+                    'depth': a.depth, 'profile': a.analysis_profile,
+                    'candidates': json.loads(a.candidate_moves_json) if a.candidate_moves_json else []}})
     return {'game_id': game.id, 'analyzed': game.analyzed, 'moves': out}
 
 
