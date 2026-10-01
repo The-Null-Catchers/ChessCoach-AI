@@ -14,6 +14,7 @@ from app.services.player_identity import link_game_players
 from app.services.pgn import parse_pgn_many
 from app.tasks.analysis import analyze_game
 from app.services.stockfish import analysis_profile
+from app.services.player_analytics import accuracy_from_cpl, classify_endgame
 
 router = APIRouter(prefix='/games', tags=['games'])
 
@@ -130,7 +131,105 @@ def game_analysis(game_id: str, user_id: str = Depends(current_user_id), db: Ses
                     'cpl': a.centipawn_loss, 'classification': a.classification, 'best_move': a.best_move_uci, 'pv': a.pv_uci,
                     'depth': a.depth, 'profile': a.analysis_profile,
                     'candidates': json.loads(a.candidate_moves_json) if a.candidate_moves_json else []}})
-    return {'game_id': game.id, 'analyzed': game.analyzed, 'moves': out}
+    player = db.scalar(select(GamePlayer).where(
+        GamePlayer.game_id == game.id,
+        GamePlayer.user_id == user_id,
+    ))
+    player_color = player.color if player else None
+
+    endgame_start = None
+    for move in moves:
+        if classify_endgame(move.fen_after):
+            endgame_start = move.ply + 1
+            break
+
+    phase_cpl = {"opening": [], "middlegame": [], "endgame": []}
+    critical_moments = []
+    strongest_moves = []
+    missed_wins = 0
+    defensive_mistakes = 0
+
+    for move in moves:
+        analysis = db.scalar(select(EngineAnalysis).where(EngineAnalysis.move_id == move.id))
+        if analysis is None or player_color is None:
+            continue
+        is_player_move = (
+            (move.ply % 2 == 1 and player_color == "white")
+            or (move.ply % 2 == 0 and player_color == "black")
+        )
+        if not is_player_move:
+            continue
+
+        cpl = analysis.centipawn_loss or 0
+        if move.ply <= 20:
+            phase = "opening"
+        elif endgame_start is not None and move.ply >= endgame_start:
+            phase = "endgame"
+        else:
+            phase = "middlegame"
+        phase_cpl[phase].append(cpl)
+
+        if analysis.classification in {"inaccuracy", "mistake", "blunder"}:
+            critical_moments.append({
+                "move_id": move.id,
+                "ply": move.ply,
+                "san": move.san,
+                "classification": analysis.classification,
+                "cpl": cpl,
+            })
+        if analysis.classification in {"best", "excellent"}:
+            strongest_moves.append({
+                "move_id": move.id,
+                "ply": move.ply,
+                "san": move.san,
+                "classification": analysis.classification,
+                "cpl": cpl,
+            })
+        if (
+            analysis.eval_before_cp is not None
+            and analysis.eval_after_cp is not None
+            and analysis.eval_before_cp >= 180
+            and analysis.eval_after_cp <= 0
+        ):
+            missed_wins += 1
+        if (
+            analysis.eval_before_cp is not None
+            and analysis.eval_before_cp <= -120
+            and cpl >= 80
+        ):
+            defensive_mistakes += 1
+
+    critical_moments.sort(key=lambda item: item["cpl"], reverse=True)
+    strongest_moves.sort(key=lambda item: (item["cpl"], item["ply"]))
+
+    summary = {
+        "phase_accuracy": {
+            phase: accuracy_from_cpl(values) if values else None
+            for phase, values in phase_cpl.items()
+        },
+        "critical_moments": critical_moments[:6],
+        "biggest_mistake": critical_moments[0] if critical_moments else None,
+        "strongest_moves": strongest_moves[:6],
+        "missed_wins": missed_wins,
+        "defensive_mistakes": defensive_mistakes,
+    }
+
+    return {
+        'game_id': game.id,
+        'analyzed': game.analyzed,
+        'game': {
+            'white': game.white_name,
+            'black': game.black_name,
+            'result': game.result,
+            'eco': game.eco,
+            'opening': game.opening,
+            'variation': game.variation,
+            'time_control': game.time_control,
+            'player_color': player_color,
+        },
+        'summary': summary,
+        'moves': out,
+    }
 
 
 @router.post('/{game_id}/player', status_code=202)
