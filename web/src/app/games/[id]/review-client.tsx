@@ -202,6 +202,7 @@ export default function GameReviewClient({ gameId }: { gameId: string }) {
   const relatedMistake = move?.analysis && ["inaccuracy", "mistake", "blunder"].includes(move.analysis.classification)
     ? mistakes.find((item) => item.move_id === move.move_id) ?? null
     : null;
+  const selectedCandidates = move?.analysis?.candidates ?? [];
 
   if (error) return <main><div className="review-shell"><h1>Game review</h1><p>{error}</p></div></main>;
   if (!game) return <main><div className="review-shell"><p>Loading analysis…</p></div></main>;
@@ -264,9 +265,9 @@ export default function GameReviewClient({ gameId }: { gameId: string }) {
             <p><b>Centipawn loss:</b> {move.analysis.cpl ?? "—"}</p>
             <p><b>Analysis:</b> {move.analysis.profile} · depth {move.analysis.depth}</p>
           </div>}
-          {move?.analysis?.candidates?.length > 0 && <div className="candidate-lines">
+          {selectedCandidates.length > 0 && <div className="candidate-lines">
             <p className="eyebrow">TOP CANDIDATES</p>
-            {move.analysis.candidates.map((candidate) => <div className="candidate-line" key={candidate.rank}>
+            {selectedCandidates.map((candidate) => <div className="candidate-line" key={candidate.rank}>
               <span>#{candidate.rank}</span>
               <div><b>{candidate.move ?? "—"}</b><code>{candidate.pv}</code></div>
               <strong>{candidate.mate_in !== null ? `M${candidate.mate_in}` : evaluationLabel(candidate.score_cp)}</strong>
