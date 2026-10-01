@@ -105,6 +105,7 @@ test("runs the critical coaching loop from PGN import through puzzle mastery", a
   await page.getByRole("button", { name: to }).click();
   await expect(page.getByText("Correct. How difficult was this recall?")).toBeVisible();
   await page.getByRole("button", { name: "Good" }).click();
+  await expect(page.getByText("Correct. How difficult was this recall?")).not.toBeVisible();
 
   const trainingResponse = await page.request.get(`${apiBase}/training`, { headers });
   expect(trainingResponse.ok()).toBeTruthy();
