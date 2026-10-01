@@ -83,6 +83,124 @@ def _pinned_squares(board: chess.Board, color: chess.Color) -> set[chess.Square]
         and board.is_pinned(color, square)
     }
 
+
+
+def _slider_directions(piece_type: chess.PieceType) -> tuple[tuple[int, int], ...]:
+    orthogonal = ((1, 0), (-1, 0), (0, 1), (0, -1))
+    diagonal = ((1, 1), (1, -1), (-1, 1), (-1, -1))
+    if piece_type == chess.ROOK:
+        return orthogonal
+    if piece_type == chess.BISHOP:
+        return diagonal
+    if piece_type == chess.QUEEN:
+        return orthogonal + diagonal
+    return ()
+
+
+def _skewer_targets(
+    board: chess.Board,
+    attacker_square: chess.Square,
+    attacker_color: chess.Color,
+) -> list[chess.Square]:
+    attacker = board.piece_at(attacker_square)
+    if not attacker or attacker.color != attacker_color:
+        return []
+    directions = _slider_directions(attacker.piece_type)
+    if not directions:
+        return []
+
+    attacker_file = chess.square_file(attacker_square)
+    attacker_rank = chess.square_rank(attacker_square)
+    for file_step, rank_step in directions:
+        enemy_targets: list[chess.Square] = []
+        file_ = attacker_file + file_step
+        rank = attacker_rank + rank_step
+        while 0 <= file_ < 8 and 0 <= rank < 8:
+            square = chess.square(file_, rank)
+            piece = board.piece_at(square)
+            if piece is not None:
+                if piece.color == attacker_color:
+                    break
+                enemy_targets.append(square)
+                if len(enemy_targets) == 2:
+                    front = board.piece_at(enemy_targets[0])
+                    rear = board.piece_at(enemy_targets[1])
+                    if (
+                        front is not None
+                        and rear is not None
+                        and PIECE_VALUES[front.piece_type] > PIECE_VALUES[rear.piece_type]
+                        and PIECE_VALUES[front.piece_type] >= 5
+                    ):
+                        return enemy_targets
+                    break
+            file_ += file_step
+            rank += rank_step
+    return []
+
+
+def _revealed_attack_targets(
+    before: chess.Board,
+    after: chess.Board,
+    mover: chess.Color,
+    moved_to: chess.Square,
+) -> list[chess.Square]:
+    targets: list[chess.Square] = []
+    for square, target in before.piece_map().items():
+        if target.color == mover or PIECE_VALUES[target.piece_type] < 3:
+            continue
+        before_attackers = set(before.attackers(mover, square))
+        after_attackers = set(after.attackers(mover, square))
+        for attacker_square in after_attackers - before_attackers:
+            if attacker_square == moved_to:
+                continue
+            attacker = after.piece_at(attacker_square)
+            if attacker and attacker.piece_type in {chess.BISHOP, chess.ROOK, chess.QUEEN}:
+                targets.append(square)
+                break
+    return targets
+
+
+def _overloaded_defender_targets(
+    board: chess.Board,
+    defender_square: chess.Square,
+    attacker_color: chess.Color,
+) -> list[chess.Square]:
+    defender = board.piece_at(defender_square)
+    if not defender or defender.color == attacker_color:
+        return []
+    defended: list[chess.Square] = []
+    for square in board.attacks(defender_square):
+        target = board.piece_at(square)
+        if (
+            target
+            and target.color == defender.color
+            and target.piece_type != chess.KING
+            and PIECE_VALUES[target.piece_type] >= 3
+            and board.attackers(attacker_color, square)
+        ):
+            defended.append(square)
+    return defended
+
+
+def _sole_defender_targets(
+    board: chess.Board,
+    defender_square: chess.Square,
+    attacker_color: chess.Color,
+) -> list[chess.Square]:
+    defender = board.piece_at(defender_square)
+    if not defender or defender.color == attacker_color:
+        return []
+    targets: list[chess.Square] = []
+    for square in board.attacks(defender_square):
+        target = board.piece_at(square)
+        if not target or target.color != defender.color or target.piece_type == chess.KING:
+            continue
+        defenders = set(board.attackers(defender.color, square))
+        if defenders == {defender_square} and board.attackers(attacker_color, square):
+            targets.append(square)
+    return targets
+
+
 def detect_semantic_mistakes(
     fen_before: str,
     played_uci: str,
@@ -175,6 +293,82 @@ def detect_semantic_mistakes(
                     explanation="A strong checking move was available and should have been considered before quieter alternatives.",
                     evidence={"played": played_uci, "best_move": best_move_uci},
                 ))
+
+            skewer_targets = _skewer_targets(board_best, best.to_square, mover)
+            if skewer_targets and (centipawn_loss or 0) >= 100:
+                mistakes.append(SemanticMistake(
+                    category="missed_skewer",
+                    confidence=0.89,
+                    explanation="The best move creates a skewer: the more valuable front piece must move and exposes another target behind it.",
+                    evidence={
+                        "best_move": best_move_uci,
+                        "targets": [chess.square_name(square) for square in skewer_targets],
+                    },
+                ))
+
+            revealed_targets = _revealed_attack_targets(before, board_best, mover, best.to_square)
+            if revealed_targets and (centipawn_loss or 0) >= 100:
+                mistakes.append(SemanticMistake(
+                    category="missed_discovered_attack",
+                    confidence=0.87,
+                    explanation="Moving the blocking piece would reveal a line attack from a bishop, rook, or queen onto a valuable target.",
+                    evidence={
+                        "best_move": best_move_uci,
+                        "targets": [chess.square_name(square) for square in revealed_targets],
+                    },
+                ))
+
+            captured = before.piece_at(best.to_square)
+            if captured and captured.color != mover and (centipawn_loss or 0) >= 100:
+                overloaded = _overloaded_defender_targets(before, best.to_square, mover)
+                if len(overloaded) >= 2:
+                    mistakes.append(SemanticMistake(
+                        category="overloaded_defender",
+                        confidence=0.86,
+                        explanation="The best move removes an overloaded defender that is trying to protect multiple attacked pieces.",
+                        evidence={
+                            "best_move": best_move_uci,
+                            "defender": chess.square_name(best.to_square),
+                            "targets": [chess.square_name(square) for square in overloaded],
+                        },
+                    ))
+                sole_targets = _sole_defender_targets(before, best.to_square, mover)
+                if sole_targets:
+                    mistakes.append(SemanticMistake(
+                        category="removal_of_defender",
+                        confidence=0.85,
+                        explanation="The best move removes a key defender, leaving another valuable piece without adequate protection.",
+                        evidence={
+                            "best_move": best_move_uci,
+                            "defender": chess.square_name(best.to_square),
+                            "targets": [chess.square_name(square) for square in sole_targets],
+                        },
+                    ))
+
+            if board_best.is_checkmate() and (centipawn_loss or 0) >= 100:
+                mistakes.append(SemanticMistake(
+                    category="mating_pattern",
+                    confidence=0.99,
+                    explanation="A forced mating move was available and should take priority over non-forcing alternatives.",
+                    evidence={"best_move": best_move_uci},
+                ))
+                checked_king = board_best.king(not mover)
+                best_piece = board_best.piece_at(best.to_square)
+                if (
+                    checked_king is not None
+                    and chess.square_rank(checked_king) in {0, 7}
+                    and best_piece is not None
+                    and best_piece.piece_type in {chess.ROOK, chess.QUEEN}
+                ):
+                    mistakes.append(SemanticMistake(
+                        category="back_rank_weakness",
+                        confidence=0.96,
+                        explanation="The mating move exploits a back-rank king with no safe flight square.",
+                        evidence={
+                            "best_move": best_move_uci,
+                            "king_square": chess.square_name(checked_king),
+                        },
+                    ))
 
     if not mistakes:
         confidence = min(0.9, 0.55 + min((centipawn_loss or 0) / 1000, 0.3))

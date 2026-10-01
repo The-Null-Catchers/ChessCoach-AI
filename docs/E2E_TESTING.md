@@ -12,6 +12,16 @@ The browser job starts the API and Next.js app, installs Chromium through Playwr
 4. change a persisted feature flag;
 5. reload and verify that the runtime flag state remains changed.
 
+The browser suite also exercises the critical coaching loop against a real Celery + Stockfish worker:
+
+1. register a player;
+2. paste and import a PGN;
+3. follow SSE progress until engine analysis is complete;
+4. open the analyzed game and inspect a detected mistake;
+5. load the puzzle generated from that game;
+6. solve the engine-backed move and grade it;
+7. verify that persisted puzzle mastery/training statistics changed.
+
 Run locally after starting PostgreSQL, Redis, the API and web app:
 
 ```bash

@@ -50,6 +50,7 @@ export default function ImportPage() {
     payload.set("pgn_text", pgn);
     const playerName = String(form.get("player_name") ?? "").trim();
     if (playerName) payload.set("player_name", playerName);
+    payload.set("analysis_strength", String(form.get("analysis_strength") ?? "normal"));
     const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
     setMessage("Importing games…");
     const response = await fetch(`${base}/games/import`, {
@@ -78,6 +79,13 @@ export default function ImportPage() {
     <form onSubmit={submit}>
       <label>Your chess username or PGN player name
         <input name="player_name" placeholder="Optional, helps ChessCoach identify your color" />
+      </label>
+      <label>Analysis strength
+        <select name="analysis_strength" defaultValue="normal">
+          <option value="quick">Quick · faster review</option>
+          <option value="normal">Normal · recommended</option>
+          <option value="deep">Deep · more candidate moves</option>
+        </select>
       </label>
       <textarea name="pgn" rows={18} placeholder={'[Event "My Game"]\\n[White "You"]\\n[Black "Opponent"]\\n\\n1. e4 e5 2. Nf3 ...'} />
       <button type="submit">Analyze PGN</button>

@@ -13,7 +13,12 @@ class Settings(BaseSettings):
     refresh_token_days: int = 30
     stockfish_path: str = '/usr/games/stockfish'
     max_pgn_bytes: int = 10 * 1024 * 1024
+    analysis_quick_depth: int = 10
+    analysis_quick_multipv: int = 1
     analysis_default_depth: int = 16
+    analysis_normal_multipv: int = 2
+    analysis_deep_depth: int = 22
+    analysis_deep_multipv: int = 3
     cors_origins: str = 'http://localhost:3000'
     ai_provider: str = 'template'
     ai_model: str = 'deterministic-v1'

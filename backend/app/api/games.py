@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import jwt
 from typing import Literal
 from pydantic import BaseModel
@@ -12,6 +13,8 @@ from app.models.entities import Game, GamePlayer, Move, AnalysisJob, EngineAnaly
 from app.services.player_identity import link_game_players
 from app.services.pgn import parse_pgn_many
 from app.tasks.analysis import analyze_game
+from app.services.stockfish import analysis_profile
+from app.services.player_analytics import accuracy_from_cpl, classify_endgame
 
 router = APIRouter(prefix='/games', tags=['games'])
 
@@ -43,6 +46,7 @@ def current_user_id(
 @router.post('/import', status_code=202)
 async def import_games(request: Request, pgn_text: str | None = Form(default=None), file: UploadFile | None = File(default=None),
                        player_name: str | None = Form(default=None),
+                       analysis_strength: str = Form(default="normal"),
                        user_id: str = Depends(current_user_id), db: Session = Depends(get_db)):
     enforce_rate_limit(request, GAME_IMPORT_LIMIT, subject=user_id)
     if not pgn_text and not file:
@@ -51,6 +55,10 @@ async def import_games(request: Request, pgn_text: str | None = Form(default=Non
         raw = await file.read(settings.max_pgn_bytes + 1)
         if len(raw) > settings.max_pgn_bytes: raise HTTPException(413, 'PGN too large')
         pgn_text = raw.decode('utf-8', errors='strict')
+    try:
+        selected_profile = analysis_profile(analysis_strength)
+    except ValueError as exc:
+        raise HTTPException(422, 'analysis_strength must be quick, normal, or deep') from exc
     parsed = parse_pgn_many(pgn_text or '')
     if not parsed: raise HTTPException(422, 'No valid games found')
     imported = []
@@ -74,7 +82,7 @@ async def import_games(request: Request, pgn_text: str | None = Form(default=Non
                         fen_after=m.fen_after, clock_seconds=m.clock_seconds))
         job = AnalysisJob(user_id=user_id, game_id=game.id, status='queued', progress=0)
         db.add(job); db.commit()
-        analyze_game.delay(game.id, job.id)
+        analyze_game.delay(game.id, job.id, selected_profile.name)
         imported.append({'game_id': game.id, 'job_id': job.id, 'duplicate': False})
     return {'count': len(imported), 'games': imported}
 
@@ -120,8 +128,108 @@ def game_analysis(game_id: str, user_id: str = Depends(current_user_id), db: Ses
         a = db.scalar(select(EngineAnalysis).where(EngineAnalysis.move_id == m.id))
         out.append({'move_id': m.id, 'ply': m.ply, 'san': m.san, 'uci': m.uci, 'fen_before': m.fen_before, 'fen_after': m.fen_after,
                     'analysis': None if not a else {'before_cp': a.eval_before_cp, 'after_cp': a.eval_after_cp,
-                    'cpl': a.centipawn_loss, 'classification': a.classification, 'best_move': a.best_move_uci, 'pv': a.pv_uci}})
-    return {'game_id': game.id, 'analyzed': game.analyzed, 'moves': out}
+                    'cpl': a.centipawn_loss, 'classification': a.classification, 'best_move': a.best_move_uci, 'pv': a.pv_uci,
+                    'depth': a.depth, 'profile': a.analysis_profile,
+                    'candidates': json.loads(a.candidate_moves_json) if a.candidate_moves_json else []}})
+    player = db.scalar(select(GamePlayer).where(
+        GamePlayer.game_id == game.id,
+        GamePlayer.user_id == user_id,
+    ))
+    player_color = player.color if player else None
+
+    endgame_start = None
+    for move in moves:
+        if classify_endgame(move.fen_after):
+            endgame_start = move.ply + 1
+            break
+
+    phase_cpl = {"opening": [], "middlegame": [], "endgame": []}
+    critical_moments = []
+    strongest_moves = []
+    missed_wins = 0
+    defensive_mistakes = 0
+
+    for move in moves:
+        analysis = db.scalar(select(EngineAnalysis).where(EngineAnalysis.move_id == move.id))
+        if analysis is None or player_color is None:
+            continue
+        is_player_move = (
+            (move.ply % 2 == 1 and player_color == "white")
+            or (move.ply % 2 == 0 and player_color == "black")
+        )
+        if not is_player_move:
+            continue
+
+        cpl = analysis.centipawn_loss or 0
+        if move.ply <= 20:
+            phase = "opening"
+        elif endgame_start is not None and move.ply >= endgame_start:
+            phase = "endgame"
+        else:
+            phase = "middlegame"
+        phase_cpl[phase].append(cpl)
+
+        if analysis.classification in {"inaccuracy", "mistake", "blunder"}:
+            critical_moments.append({
+                "move_id": move.id,
+                "ply": move.ply,
+                "san": move.san,
+                "classification": analysis.classification,
+                "cpl": cpl,
+            })
+        if analysis.classification in {"best", "excellent"}:
+            strongest_moves.append({
+                "move_id": move.id,
+                "ply": move.ply,
+                "san": move.san,
+                "classification": analysis.classification,
+                "cpl": cpl,
+            })
+        if (
+            analysis.eval_before_cp is not None
+            and analysis.eval_after_cp is not None
+            and analysis.eval_before_cp >= 180
+            and analysis.eval_after_cp <= 0
+        ):
+            missed_wins += 1
+        if (
+            analysis.eval_before_cp is not None
+            and analysis.eval_before_cp <= -120
+            and cpl >= 80
+        ):
+            defensive_mistakes += 1
+
+    critical_moments.sort(key=lambda item: item["cpl"], reverse=True)
+    strongest_moves.sort(key=lambda item: (item["cpl"], item["ply"]))
+
+    summary = {
+        "phase_accuracy": {
+            phase: accuracy_from_cpl(values) if values else None
+            for phase, values in phase_cpl.items()
+        },
+        "critical_moments": critical_moments[:6],
+        "biggest_mistake": critical_moments[0] if critical_moments else None,
+        "strongest_moves": strongest_moves[:6],
+        "missed_wins": missed_wins,
+        "defensive_mistakes": defensive_mistakes,
+    }
+
+    return {
+        'game_id': game.id,
+        'analyzed': game.analyzed,
+        'game': {
+            'white': game.white_name,
+            'black': game.black_name,
+            'result': game.result,
+            'eco': game.eco,
+            'opening': game.opening,
+            'variation': game.variation,
+            'time_control': game.time_control,
+            'player_color': player_color,
+        },
+        'summary': summary,
+        'moves': out,
+    }
 
 
 @router.post('/{game_id}/player', status_code=202)

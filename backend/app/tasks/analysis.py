@@ -6,17 +6,18 @@ from app.db.session import SessionLocal
 from app.models.entities import AnalysisJob, EngineAnalysis, Game, GamePlayer, Mistake, Move, Puzzle
 from app.services.classification import MoveContext, classify_move
 from app.services.coach_explanations import ensure_ai_explanation
-from app.services.engine_cache import analyze_cached
+from app.services.engine_cache import analyze_cached, analyze_cached_multi
 from app.services.semantic_mistakes import detect_semantic_mistakes
 from app.services.player_analytics import recompute_player_analytics
 from app.services.mistake_taxonomy import attach_semantic_categories, ensure_primary_link
 from app.services.training import create_puzzle_from_mistake, recompute_weaknesses
 from app.services.time_management import detect_time_management, parse_simple_time_control
+from app.services.stockfish import analysis_profile
 from app.tasks.celery_app import celery
 
 
 @celery.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
-def analyze_game(self, game_id: str, job_id: str, depth: int = 16):
+def analyze_game(self, game_id: str, job_id: str, profile_name: str = "normal"):
     db = SessionLocal()
     try:
         job = db.get(AnalysisJob, job_id)
@@ -28,6 +29,7 @@ def analyze_game(self, game_id: str, job_id: str, depth: int = 16):
         job.progress = 5
         db.commit()
 
+        profile = analysis_profile(profile_name)
         moves = db.scalars(select(Move).where(Move.game_id == game_id).order_by(Move.ply)).all()
         total = max(1, len(moves))
         player = db.scalar(select(GamePlayer).where(
@@ -53,9 +55,19 @@ def analyze_game(self, game_id: str, job_id: str, depth: int = 16):
 
         for i, move in enumerate(moves):
             analysis = db.scalar(select(EngineAnalysis).where(EngineAnalysis.move_id == move.id))
-            if analysis is None:
-                before = analyze_cached(db, move.fen_before, depth)
-                after_raw = analyze_cached(db, move.fen_after, depth)
+            should_refresh = (
+                analysis is None
+                or analysis.depth < profile.depth
+                or analysis.analysis_profile != profile.name
+            )
+            if should_refresh:
+                before, candidates = analyze_cached_multi(
+                    db,
+                    move.fen_before,
+                    depth=profile.depth,
+                    multipv=profile.multipv,
+                )
+                after_raw = analyze_cached(db, move.fen_after, profile.depth)
                 after_cp = None if after_raw.score_cp is None else -after_raw.score_cp
                 after_mate = None if after_raw.mate_in is None else -after_raw.mate_in
                 classification, cpl = classify_move(
@@ -66,19 +78,31 @@ def analyze_game(self, game_id: str, job_id: str, depth: int = 16):
                         mate_after=after_mate,
                     )
                 )
-                analysis = EngineAnalysis(
-                    move_id=move.id,
-                    eval_before_cp=before.score_cp,
-                    eval_after_cp=after_cp,
-                    mate_before=before.mate_in,
-                    mate_after=after_mate,
-                    centipawn_loss=cpl,
-                    classification=classification,
-                    best_move_uci=before.best_move_uci,
-                    pv_uci=before.pv_uci,
-                    depth=depth,
-                )
-                db.add(analysis)
+                candidate_moves_json = json.dumps([
+                    {
+                        "rank": rank,
+                        "score_cp": item.score_cp,
+                        "mate_in": item.mate_in,
+                        "move": item.best_move_uci,
+                        "pv": item.pv_uci,
+                        "depth": item.depth,
+                    }
+                    for rank, item in enumerate(candidates, start=1)
+                ])
+                if analysis is None:
+                    analysis = EngineAnalysis(move_id=move.id)
+                    db.add(analysis)
+                analysis.eval_before_cp = before.score_cp
+                analysis.eval_after_cp = after_cp
+                analysis.mate_before = before.mate_in
+                analysis.mate_after = after_mate
+                analysis.centipawn_loss = cpl
+                analysis.classification = classification
+                analysis.best_move_uci = before.best_move_uci
+                analysis.pv_uci = before.pv_uci
+                analysis.depth = profile.depth
+                analysis.analysis_profile = profile.name
+                analysis.candidate_moves_json = candidate_moves_json
                 db.flush()
 
             is_player_move = player_color is not None and (

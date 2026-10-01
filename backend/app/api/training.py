@@ -30,12 +30,13 @@ def get_training(
         .where(TrainingSession.plan_id == plan.id)
         .order_by(TrainingSession.scheduled_for.asc())
     ).all()
-    due_reviews = db.scalars(
-        select(ReviewState).where(
-            ReviewState.user_id == user_id,
-            ReviewState.due_at <= datetime.utcnow(),
-        )
+    review_states = db.scalars(
+        select(ReviewState).where(ReviewState.user_id == user_id)
     ).all()
+    due_reviews = [
+        review for review in review_states
+        if review.due_at <= datetime.utcnow()
+    ]
     return {
         "plan": {
             "id": plan.id,
@@ -44,6 +45,8 @@ def get_training(
             "focus_summary": plan.focus_summary,
         },
         "due_reviews": len(due_reviews),
+        "reviewed_puzzles": len(review_states),
+        "puzzle_mastery": round(sum(item.mastery for item in review_states) / len(review_states) * 100, 1) if review_states else 0.0,
         "sessions": [
             {
                 "id": s.id,

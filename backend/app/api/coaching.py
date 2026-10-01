@@ -70,6 +70,13 @@ def _apply_review_grade(
     review.lapses = scheduled.lapses
     review.due_at = scheduled.due_at
     review.last_reviewed_at = now
+    mastery_delta = {
+        "Again": -0.15,
+        "Hard": 0.08,
+        "Good": 0.18,
+        "Easy": 0.28,
+    }[grade]
+    review.mastery = min(1.0, max(0.0, review.mastery + mastery_delta))
     return review
 
 
@@ -202,6 +209,7 @@ def puzzle_queue(
             "due_at": review.due_at.isoformat() if review else None,
             "repetitions": review.repetitions if review else 0,
             "lapses": review.lapses if review else 0,
+            "mastery": round((review.mastery if review else 0.0) * 100, 1),
         }
         for puzzle, review in rows
     ]
@@ -258,6 +266,7 @@ def attempt_puzzle(
         "requires_grade": correct and payload.grade is None,
         "next_due_at": review.due_at.isoformat() if review else None,
         "interval_days": review.interval_days if review else None,
+        "mastery": round((review.mastery if review else 0.0) * 100, 1) if review else None,
     }
 
 
@@ -292,4 +301,5 @@ def grade_puzzle(
         "next_due_at": review.due_at.isoformat(),
         "interval_days": review.interval_days,
         "ease_factor": review.ease_factor,
+        "mastery": round(review.mastery * 100, 1),
     }

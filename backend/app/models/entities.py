@@ -240,12 +240,14 @@ class Move(Base):
 
 class PositionAnalysis(Base):
     __tablename__ = 'position_analyses'
-    __table_args__ = (UniqueConstraint('position_hash', 'engine_key', 'depth', name='uq_cached_position'),)
+    __table_args__ = (UniqueConstraint('position_hash', 'engine_key', 'depth', 'multipv', name='uq_cached_position'),)
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
     position_hash: Mapped[str] = mapped_column(String(64), index=True)
     fen: Mapped[str] = mapped_column(String(120))
     engine_key: Mapped[str] = mapped_column(String(64), default='stockfish')
     depth: Mapped[int] = mapped_column(Integer)
+    multipv: Mapped[int] = mapped_column(Integer, default=1)
+    candidates_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     score_cp: Mapped[int | None] = mapped_column(Integer, nullable=True)
     mate_in: Mapped[int | None] = mapped_column(Integer, nullable=True)
     best_move_uci: Mapped[str | None] = mapped_column(String(8), nullable=True)
@@ -266,6 +268,8 @@ class EngineAnalysis(Base):
     best_move_uci: Mapped[str | None] = mapped_column(String(8), nullable=True)
     pv_uci: Mapped[str | None] = mapped_column(Text, nullable=True)
     depth: Mapped[int] = mapped_column(Integer)
+    analysis_profile: Mapped[str] = mapped_column(String(16), default='normal')
+    candidate_moves_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Mistake(Base):
@@ -356,6 +360,7 @@ class ReviewState(Base):
     interval_days: Mapped[int] = mapped_column(Integer, default=0)
     ease_factor: Mapped[float] = mapped_column(Float, default=2.5)
     lapses: Mapped[int] = mapped_column(Integer, default=0)
+    mastery: Mapped[float] = mapped_column(Float, default=0)
     due_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
