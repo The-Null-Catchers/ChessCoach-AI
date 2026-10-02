@@ -11,6 +11,7 @@ The repository now includes the core end-to-end coaching loop rather than a UI-o
 - one-time email verification and password-reset flows with hashed expiring tokens
 - Redis-backed abuse rate limiting for sensitive authentication endpoints
 - multi-game PGN parsing, duplicate detection, player-side identification and clock extraction
+- provider-backed Lichess and Chess.com account imports with bounded fetches, account linking and source-aware game persistence
 - asynchronous Stockfish analysis through Celery + Redis with persistent worker engines and quick/normal/deep profiles
 - normalized position hashing and cached engine analysis
 - context-aware move classification with mate-aware handling and cached MultiPV candidate lines
@@ -75,7 +76,6 @@ Register → import PGN → analysis worker processes the game → inspect criti
 
 The core coaching loop is implemented and covered by a real browser E2E flow. Remaining product-completeness work is intentionally focused rather than a rewrite:
 
-- provider-backed Lichess / Chess.com account import adapters
 - broader positional/strategic semantic detectors and historical weakness snapshots
 - push-notification delivery abstraction
 - richer AI/provider usage accounting and operations telemetry

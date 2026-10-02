@@ -19,6 +19,7 @@ FastAPI publishes generated OpenAPI at `/openapi.json` and interactive documenta
 ## Games and analysis
 
 - `POST /games/import` — PGN text/file import; accepts `analysis_strength=quick|normal|deep`
+- `POST /games/import/account` — import up to 50 recent public games from `lichess` or `chesscom`, persist the connected account, deduplicate, and queue analysis
 - `GET /games`
 - `POST /games/{id}/player`
 - `GET /games/{id}/analysis` — move analysis, MultiPV candidates and game-review summary
