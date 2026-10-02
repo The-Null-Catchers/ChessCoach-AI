@@ -152,7 +152,7 @@ export default function ImportPage() {
             <option value="50">50 recent games</option>
           </select>
         </label>
-        <label>Account analysis strength
+        <label>Engine depth for account games
           <select name="account_analysis_strength" defaultValue="normal">
             <option value="quick">Quick</option>
             <option value="normal">Normal</option>
