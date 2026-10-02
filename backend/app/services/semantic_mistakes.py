@@ -64,6 +64,100 @@ def _early_queen_move(before: chess.Board, move: chess.Move) -> bool:
     return before.fullmove_number <= 6
 
 
+def _poor_piece_development(before: chess.Board, move: chess.Move) -> bool:
+    piece = before.piece_at(move.from_square)
+    if not piece or piece.piece_type not in {chess.KNIGHT, chess.BISHOP}:
+        return False
+    if before.fullmove_number > 10:
+        return False
+
+    home_rank = 0 if piece.color == chess.WHITE else 7
+    if chess.square_rank(move.from_square) == home_rank:
+        return False
+
+    undeveloped = 0
+    for square, candidate in before.piece_map().items():
+        if (
+            candidate.color == piece.color
+            and candidate.piece_type in {chess.KNIGHT, chess.BISHOP}
+            and chess.square_rank(square) == home_rank
+        ):
+            undeveloped += 1
+    return undeveloped >= 1
+
+
+def _abandons_castling(before: chess.Board, move: chess.Move) -> bool:
+    piece = before.piece_at(move.from_square)
+    if not piece or piece.piece_type != chess.KING or before.fullmove_number > 12:
+        return False
+    if before.is_castling(move):
+        return False
+    rights = before.has_kingside_castling_rights(piece.color) or before.has_queenside_castling_rights(piece.color)
+    return rights and move.from_square == (chess.E1 if piece.color == chess.WHITE else chess.E8)
+
+
+def _creates_doubled_isolated_pawn(before: chess.Board, after: chess.Board, move: chess.Move) -> bool:
+    piece = before.piece_at(move.from_square)
+    if not piece or piece.piece_type != chess.PAWN:
+        return False
+
+    color = piece.color
+    file_ = chess.square_file(move.to_square)
+    pawns_on_file = [
+        square for square in after.pieces(chess.PAWN, color)
+        if chess.square_file(square) == file_
+    ]
+    if len(pawns_on_file) < 2:
+        return False
+
+    adjacent_files = {file_ - 1, file_ + 1}
+    has_adjacent_pawn = any(
+        0 <= adjacent < 8
+        and any(chess.square_file(square) == adjacent for square in after.pieces(chess.PAWN, color))
+        for adjacent in adjacent_files
+    )
+    if has_adjacent_pawn:
+        return False
+
+    before_count = sum(
+        chess.square_file(square) == file_
+        for square in before.pieces(chess.PAWN, color)
+    )
+    return before_count < len(pawns_on_file)
+
+
+def _endgame_king_activity_missed(before: chess.Board, move: chess.Move, best: chess.Move) -> bool:
+    non_pawns = [
+        piece for piece in before.piece_map().values()
+        if piece.piece_type not in {chess.KING, chess.PAWN}
+    ]
+    if len(non_pawns) > 4:
+        return False
+
+    mover = before.turn
+    king_square = before.king(mover)
+    if king_square is None:
+        return False
+    moved_piece = before.piece_at(move.from_square)
+    best_piece = before.piece_at(best.from_square)
+    if not moved_piece or not best_piece:
+        return False
+    if best_piece.piece_type != chess.KING or moved_piece.piece_type == chess.KING:
+        return False
+
+    centers = (chess.D4, chess.E4, chess.D5, chess.E5)
+
+    def distance(square: chess.Square) -> int:
+        file_ = chess.square_file(square)
+        rank = chess.square_rank(square)
+        return min(
+            abs(file_ - chess.square_file(center)) + abs(rank - chess.square_rank(center))
+            for center in centers
+        )
+
+    return distance(best.to_square) < distance(king_square)
+
+
 
 def _fork_targets(board: chess.Board, square: chess.Square, attacker_color: chess.Color) -> list[chess.Square]:
     targets: list[chess.Square] = []
@@ -246,11 +340,44 @@ def detect_semantic_mistakes(
             evidence={"played": played_uci, "fullmove": before.fullmove_number},
         ))
 
+    if _poor_piece_development(before, move):
+        mistakes.append(SemanticMistake(
+            category="poor_piece_development",
+            confidence=0.76,
+            explanation="A developed minor piece moved again while another minor piece was still undeveloped, costing development time.",
+            evidence={"played": played_uci, "fullmove": before.fullmove_number},
+        ))
+
+    if _abandons_castling(before, move):
+        mistakes.append(SemanticMistake(
+            category="delayed_castling",
+            confidence=0.79,
+            explanation="The king moved before castling while castling rights were still available, giving up a fast route to king safety.",
+            evidence={"played": played_uci, "fullmove": before.fullmove_number},
+        ))
+
+    if _creates_doubled_isolated_pawn(before, after, move):
+        mistakes.append(SemanticMistake(
+            category="pawn_structure",
+            confidence=0.83,
+            explanation="The pawn move creates a doubled isolated pawn structure that can become a long-term target.",
+            evidence={"played": played_uci, "file": chess.FILE_NAMES[chess.square_file(move.to_square)]},
+        ))
+
     if best_move_uci:
         best = chess.Move.from_uci(best_move_uci)
         if best in before.legal_moves:
             board_best = before.copy(stack=False)
             board_best.push(best)
+
+            if _endgame_king_activity_missed(before, move, best) and (centipawn_loss or 0) >= 80:
+                mistakes.append(SemanticMistake(
+                    category="king_activity",
+                    confidence=0.81,
+                    explanation="In the simplified position, the best move activates the king toward the center, but the played move leaves it passive.",
+                    evidence={"played": played_uci, "best_move": best_move_uci},
+                ))
+
             best_piece = board_best.piece_at(best.to_square)
             if best_piece and (centipawn_loss or 0) >= 100:
                 targets = _fork_targets(board_best, best.to_square, mover)
