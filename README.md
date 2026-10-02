@@ -76,7 +76,7 @@ Register → import PGN → analysis worker processes the game → inspect criti
 
 The core coaching loop is implemented and covered by a real browser E2E flow. Remaining product-completeness work is intentionally focused rather than a rewrite:
 
-- broader positional/strategic semantic detectors and historical weakness snapshots
+- historical weakness snapshots and longer-term trend comparisons
 - push-notification delivery abstraction
 - richer AI/provider usage accounting and operations telemetry
 - seeded portfolio demo data and final screenshot/release presentation polish
