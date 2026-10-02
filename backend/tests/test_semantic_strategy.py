@@ -38,9 +38,12 @@ def test_detects_giving_up_castling_rights_with_early_king_move():
 
 
 def test_detects_new_doubled_isolated_pawns():
-    board = chess.Board("4k3/8/8/8/2P5/8/2P5/4K3 w - - 0 1")
+    board = chess.Board("4k3/8/8/8/2P5/2n5/1P6/4K3 w - - 0 1")
 
-    categories = _categories(board.fen(), "c2c3", "e1e2")
+    move = chess.Move.from_uci("b2c3")
+    assert move in board.legal_moves
+
+    categories = _categories(board.fen(), "b2c3", "e1e2")
     assert "pawn_structure" in categories
 
 
