@@ -23,6 +23,7 @@ The repository now includes the core end-to-end coaching loop rather than a UI-o
 - user-game puzzle generation and spaced repetition (Again / Hard / Good / Easy)
 - adaptive weekly training plans and session tracking
 - analytics for phase accuracy, openings, endgames, weaknesses and evidence-based insights
+- historical weakness snapshots with short-term and long-term improving/stable/worsening trend comparisons
 - normalized opening repertoire move trees with PGN variation import and spaced-repetition training
 - curated endgame technique trainer with legal-move validation, mastery tracking and spaced repetition
 - Next.js dashboard, auth, import, game library, rich game review with evaluation graph/critical moments/MultiPV, puzzles, training and analytics
@@ -76,7 +77,6 @@ Register → import PGN → analysis worker processes the game → inspect criti
 
 The core coaching loop is implemented and covered by a real browser E2E flow. Remaining product-completeness work is intentionally focused rather than a rewrite:
 
-- historical weakness snapshots and longer-term trend comparisons
 - push-notification delivery abstraction
 - richer AI/provider usage accounting and operations telemetry
 - seeded portfolio demo data and final screenshot/release presentation polish
