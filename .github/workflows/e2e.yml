@@ -119,7 +119,9 @@ jobs:
   mobile-smoke:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Ubuntu hosted runners do not expose KVM. Cold boot + Flutter install routinely
+    # needs ~25 minutes, so keep a small safety margin around the real smoke test.
+    timeout-minutes: 35
     services:
       postgres:
         image: postgres:17-alpine
