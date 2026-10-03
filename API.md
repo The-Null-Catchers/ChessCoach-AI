@@ -67,6 +67,11 @@ FastAPI publishes generated OpenAPI at `/openapi.json` and interactive documenta
 - `GET /notifications`
 - `POST /notifications/{id}/read`
 - `POST /notifications/read-all`
+- `GET /notifications/push/subscriptions` — list the authenticated user's registered devices without exposing push tokens
+- `POST /notifications/push/subscriptions` — register or reactivate an Android, iOS or web push token
+- `DELETE /notifications/push/subscriptions/{subscription_id}` — deactivate a device subscription
+
+Push delivery uses a transactional outbox (`push_deliveries`) so notification creation and delivery intent are committed together. Delivery is asynchronous through Celery, retry-bounded, idempotent per notification/device pair, and disabled by default. Production can set `PUSH_PROVIDER=webhook` to forward normalized payloads to an FCM/APNs gateway without coupling the product domain to a specific vendor.
 
 ## Operations
 
