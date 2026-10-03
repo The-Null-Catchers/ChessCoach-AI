@@ -119,9 +119,9 @@ jobs:
   mobile-smoke:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    # Ubuntu hosted runners do not expose KVM. Cold boot + Flutter install routinely
-    # needs ~25 minutes, so keep a small safety margin around the real smoke test.
-    timeout-minutes: 35
+    # GitHub-hosted Linux runners do not expose KVM. The software-emulated
+    # Android boot and test install can legitimately take well over 35 minutes.
+    timeout-minutes: 60
     services:
       postgres:
         image: postgres:17-alpine
@@ -215,7 +215,7 @@ jobs:
   mobile-e2e:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 60
     services:
       postgres:
         image: postgres:17-alpine
