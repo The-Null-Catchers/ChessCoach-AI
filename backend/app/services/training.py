@@ -17,6 +17,7 @@ from app.models.entities import (
     PlayerWeakness,
     Puzzle,
 )
+from app.models.weakness_history import WeaknessSnapshot
 from app.services.mistake_taxonomy import ensure_primary_link
 
 
@@ -58,6 +59,12 @@ def _is_player_ply(ply: int, color: str) -> bool:
     return (ply % 2 == 1 and color == "white") or (ply % 2 == 0 and color == "black")
 
 
+def weakness_trend_delta(previous_score: float | None, current_score: float) -> float:
+    if previous_score is None:
+        return 0.0
+    return round(current_score - previous_score, 4)
+
+
 def recompute_weaknesses(db: Session, user_id: str) -> list[PlayerWeakness]:
     rows = db.execute(
         select(Mistake, Move, GamePlayer)
@@ -88,14 +95,42 @@ def recompute_weaknesses(db: Session, user_id: str) -> list[PlayerWeakness]:
         sample_confidence = 1.0 - math.exp(-n / 6.0)
         confidence = round(min(0.99, avg_detection_confidence * sample_confidence), 4)
         score = round(avg_severity * (0.6 + 0.4 * confidence), 4)
+
+        latest_snapshot = db.scalar(
+            select(WeaknessSnapshot)
+            .where(
+                WeaknessSnapshot.user_id == user_id,
+                WeaknessSnapshot.category == category,
+            )
+            .order_by(WeaknessSnapshot.captured_at.desc())
+            .limit(1)
+        )
+        previous_score = latest_snapshot.score if latest_snapshot is not None else None
+        trend = weakness_trend_delta(previous_score, score)
+
         weakness = PlayerWeakness(
             user_id=user_id,
             category=category,
             score=score,
             confidence=confidence,
             sample_size=n,
-            trend=0.0,
+            trend=trend,
         )
         db.add(weakness)
         weaknesses.append(weakness)
+
+        changed = (
+            latest_snapshot is None
+            or latest_snapshot.score != score
+            or latest_snapshot.confidence != confidence
+            or latest_snapshot.sample_size != n
+        )
+        if changed:
+            db.add(WeaknessSnapshot(
+                user_id=user_id,
+                category=category,
+                score=score,
+                confidence=confidence,
+                sample_size=n,
+            ))
     return weaknesses

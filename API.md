@@ -39,7 +39,8 @@ FastAPI publishes generated OpenAPI at `/openapi.json` and interactive documenta
 
 - `GET /training`
 - `POST /training/{session_id}/complete`
-- `GET /analytics`
+- `GET /analytics` — current performance, weaknesses and one-step weakness trend direction
+- `GET /analytics/weakness-history` — historical weakness snapshots with long-term score delta and improving/stable/worsening direction; optional `category` and `limit` (1–52)
 - `GET /openings`
 - `GET /endgames`
 - `GET /insights`

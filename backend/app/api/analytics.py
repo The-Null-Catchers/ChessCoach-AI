@@ -1,15 +1,24 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.games import current_user_id
 from app.db.session import get_db
 from app.models.entities import EndgameStat, OpeningStat, PlayerInsight, PlayerWeakness, Profile
+from app.models.weakness_history import WeaknessSnapshot
 from app.services.player_analytics import compute_overview
 
 router = APIRouter(tags=["analytics"])
+
+
+def _trend_direction(delta: float) -> str:
+    if delta < -0.01:
+        return "improving"
+    if delta > 0.01:
+        return "worsening"
+    return "stable"
 
 
 @router.get("/analytics")
@@ -75,6 +84,7 @@ def analytics(
                 "confidence": item.confidence,
                 "sample_size": item.sample_size,
                 "trend": item.trend,
+                "direction": _trend_direction(item.trend),
             }
             for item in weaknesses
         ],
@@ -89,6 +99,74 @@ def analytics(
             for item in insights
         ],
     }
+
+
+@router.get("/analytics/weakness-history")
+def weakness_history(
+    category: str | None = None,
+    limit: int = Query(default=12, ge=1, le=52),
+    user_id: str = Depends(current_user_id),
+    db: Session = Depends(get_db),
+):
+    if category is not None:
+        category = category.strip()
+        if not category:
+            raise HTTPException(422, "category must not be blank")
+        categories = [category]
+    else:
+        current = db.scalars(
+            select(PlayerWeakness)
+            .where(PlayerWeakness.user_id == user_id)
+            .order_by(PlayerWeakness.score.desc())
+            .limit(10)
+        ).all()
+        categories = [item.category for item in current]
+
+    current_by_category = {
+        item.category: item
+        for item in db.scalars(
+            select(PlayerWeakness).where(
+                PlayerWeakness.user_id == user_id,
+                PlayerWeakness.category.in_(categories) if categories else False,
+            )
+        ).all()
+    } if categories else {}
+
+    payload = []
+    for item_category in categories:
+        snapshots = db.scalars(
+            select(WeaknessSnapshot)
+            .where(
+                WeaknessSnapshot.user_id == user_id,
+                WeaknessSnapshot.category == item_category,
+            )
+            .order_by(WeaknessSnapshot.captured_at.desc())
+            .limit(limit)
+        ).all()
+        chronological = list(reversed(snapshots))
+        long_term_delta = round(
+            chronological[-1].score - chronological[0].score,
+            4,
+        ) if len(chronological) >= 2 else 0.0
+        current = current_by_category.get(item_category)
+        payload.append({
+            "category": item_category,
+            "current_score": current.score if current else (chronological[-1].score if chronological else None),
+            "current_trend": current.trend if current else 0.0,
+            "direction": _trend_direction(long_term_delta),
+            "delta": long_term_delta,
+            "snapshots": [
+                {
+                    "score": snapshot.score,
+                    "confidence": snapshot.confidence,
+                    "sample_size": snapshot.sample_size,
+                    "captured_at": snapshot.captured_at.isoformat(),
+                }
+                for snapshot in chronological
+            ],
+        })
+
+    return {"categories": payload}
 
 
 @router.get("/openings")
