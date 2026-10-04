@@ -1,0 +1,131 @@
+name: Portfolio Evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portfolio-evidence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: chesscoach
+          POSTGRES_USER: chesscoach
+          POSTGRES_PASSWORD: chesscoach
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chesscoach -d chesscoach"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://chesscoach:chesscoach@localhost:5432/chesscoach
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: portfolio-evidence-only-secret
+      CORS_ORIGINS: http://127.0.0.1:3000
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:8000/api/v1
+      E2E_WEB_URL: http://127.0.0.1:3000
+      PORTFOLIO_EVIDENCE: "true"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Create ephemeral demo credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          email="portfolio-evidence-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@chesscoach.local"
+          password="$(openssl rand -hex 24)"
+          echo "::add-mask::${password}"
+          echo "PORTFOLIO_DEMO_EMAIL=${email}" >> "$GITHUB_ENV"
+          echo "PORTFOLIO_DEMO_PASSWORD=${password}" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies and seed deterministic demo
+        run: |
+          set -euo pipefail
+          python -m pip install -r backend/requirements.txt
+          cd backend
+          alembic upgrade head
+          ALLOW_PORTFOLIO_DEMO_SEED=true python scripts/seed_portfolio_demo.py
+          ALLOW_PORTFOLIO_DEMO_ADMIN=true python scripts/enable_portfolio_demo_admin.py
+
+      - name: Start API
+        run: |
+          set -euo pipefail
+          nohup python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000 >/tmp/chesscoach-portfolio-api.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/chesscoach-portfolio-api.log
+          exit 1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Install web and browser dependencies
+        working-directory: web
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: Start web client
+        working-directory: web
+        run: |
+          set -euo pipefail
+          nohup npm run dev -- --hostname 0.0.0.0 >/tmp/chesscoach-portfolio-web.log 2>&1 &
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:3000/login >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/chesscoach-portfolio-web.log
+          exit 1
+
+      - name: Capture portfolio evidence
+        working-directory: web
+        run: npx playwright test e2e/portfolio-evidence.spec.ts --project=chromium
+
+      - name: Print service logs on failure
+        if: failure()
+        run: |
+          cat /tmp/chesscoach-portfolio-api.log || true
+          cat /tmp/chesscoach-portfolio-web.log || true
+
+      - name: Upload portfolio evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: chesscoach-portfolio-evidence-${{ github.run_id }}
+          path: |
+            web/portfolio-evidence
+            web/playwright-report
+          if-no-files-found: warn
+          retention-days: 30
