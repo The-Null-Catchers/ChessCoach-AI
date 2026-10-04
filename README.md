@@ -1,6 +1,13 @@
 # ChessCoach AI
 
+[![CI](https://github.com/The-Null-Catchers/ChessCoach-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/The-Null-Catchers/ChessCoach-AI/actions/workflows/ci.yml)
+[![E2E](https://github.com/The-Null-Catchers/ChessCoach-AI/actions/workflows/e2e.yml/badge.svg)](https://github.com/The-Null-Catchers/ChessCoach-AI/actions/workflows/e2e.yml)
+
 ChessCoach AI is a production-oriented intelligent chess training platform that learns from a player's real games. Stockfish supplies objective chess analysis; deterministic classifiers, statistics, spaced repetition and an AI coaching layer turn critical moments into personalized training.
+
+## Release
+
+The codebase is prepared for the **v1.0.0 portfolio release**. See [`CHANGELOG.md`](CHANGELOG.md) for the release history, [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md) for the release narrative/checklist, and [`PORTFOLIO_DEMO.md`](PORTFOLIO_DEMO.md) for the deterministic showcase workflow.
 
 ## Current implementation
 
