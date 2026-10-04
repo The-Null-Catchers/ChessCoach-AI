@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from urllib.parse import urlparse
 
 import httpx
 
@@ -20,9 +21,35 @@ def normalize_username(username: str) -> str:
     return value
 
 
+def _validate_chesscom_archive_url(url: str) -> str:
+    try:
+        parsed = urlparse(url)
+        port = parsed.port
+    except (TypeError, ValueError) as exc:
+        raise ProviderImportError("Chess.com returned an invalid archive URL") from exc
+
+    path = parsed.path or ""
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != "api.chess.com"
+        or parsed.username is not None
+        or parsed.password is not None
+        or port not in (None, 443)
+        or not path.startswith("/pub/player/")
+        or "/games/" not in path
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ProviderImportError("Chess.com returned an invalid archive URL")
+    return url
+
+
 async def _get(client: httpx.AsyncClient, url: str, **kwargs) -> httpx.Response:
     try:
-        response = await client.get(url, **kwargs)
+        # Provider endpoints are expected to be canonical API URLs. Never follow
+        # redirects here: an upstream redirect to a private/internal address would
+        # otherwise turn account imports into an SSRF primitive.
+        response = await client.get(url, follow_redirects=False, **kwargs)
         response.raise_for_status()
         return response
     except httpx.HTTPStatusError as exc:
@@ -77,9 +104,14 @@ async def fetch_chesscom_games(
     except ValueError as exc:
         raise ProviderImportError("Chess.com returned malformed archive metadata") from exc
 
+    if not isinstance(archives, list):
+        raise ProviderImportError("Chess.com returned malformed archive metadata")
+
     collected: list[str] = []
     for archive_url in reversed(archives[-6:]):
-        response = await _get(client, archive_url)
+        if not isinstance(archive_url, str):
+            raise ProviderImportError("Chess.com returned an invalid archive URL")
+        response = await _get(client, _validate_chesscom_archive_url(archive_url))
         try:
             games = response.json().get("games", [])
         except ValueError as exc:
@@ -115,7 +147,7 @@ async def fetch_provider_games(
         client = httpx.AsyncClient(
             timeout=httpx.Timeout(15.0, connect=5.0),
             headers={"User-Agent": USER_AGENT},
-            follow_redirects=True,
+            follow_redirects=False,
         )
 
     try:
