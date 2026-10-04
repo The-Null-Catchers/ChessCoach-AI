@@ -19,6 +19,7 @@ The repository now includes the core end-to-end coaching loop rather than a UI-o
 - deterministic tactical motif detection for hanging pieces, forks and absolute pins
 - time-management themes when clock data is available
 - structured AI coaching with provider abstraction and deterministic fallback
+- persisted AI provider usage telemetry for requests, failures, latency, token counts and fallback behavior, with admin operations aggregation
 - SSE analysis progress
 - user-game puzzle generation and spaced repetition (Again / Hard / Good / Easy)
 - adaptive weekly training plans and session tracking
@@ -78,5 +79,4 @@ Register → import PGN → analysis worker processes the game → inspect criti
 
 The core coaching loop is implemented and covered by a real browser E2E flow. Remaining product-completeness work is intentionally focused rather than a rewrite:
 
-- richer AI/provider usage accounting and operations telemetry
 - seeded portfolio demo data and final screenshot/release presentation polish

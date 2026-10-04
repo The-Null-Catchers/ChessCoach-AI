@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import time
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -8,6 +10,7 @@ from app.ai.base import CoachingContext
 from app.ai.provider_factory import get_ai_provider
 from app.ai.template_provider import TemplateCoachProvider
 from app.models.entities import AIExplanation, EngineAnalysis, Mistake, Move, Profile
+from app.services.ai_usage import record_ai_usage
 
 PROMPT_VERSION = "coach-v1"
 
@@ -18,6 +21,10 @@ def skill_band_for_rating(rating: int | None) -> str:
     if rating < 1800:
         return "intermediate"
     return "advanced"
+
+
+def _elapsed_ms(started: float) -> int:
+    return max(0, int((time.perf_counter() - started) * 1000))
 
 
 def ensure_ai_explanation(
@@ -50,11 +57,38 @@ def ensure_ai_explanation(
     )
 
     provider = get_ai_provider()
+    started = time.perf_counter()
     try:
         result = provider.explain(context)
-    except Exception:
+        record_ai_usage(
+            db,
+            user_id=user_id,
+            move_id=move.id,
+            provider=provider,
+            status="success",
+            latency_ms=_elapsed_ms(started),
+        )
+    except Exception as exc:
+        record_ai_usage(
+            db,
+            user_id=user_id,
+            move_id=move.id,
+            provider=provider,
+            status="failed",
+            latency_ms=_elapsed_ms(started),
+            error=exc,
+        )
         provider = TemplateCoachProvider()
+        started = time.perf_counter()
         result = provider.explain(context)
+        record_ai_usage(
+            db,
+            user_id=user_id,
+            move_id=move.id,
+            provider=provider,
+            status="fallback",
+            latency_ms=_elapsed_ms(started),
+        )
 
     explanation = AIExplanation(
         move_id=move.id,

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+
 import httpx
+
 from app.ai.base import CoachingContext, CoachingExplanation
 
 
@@ -12,8 +14,12 @@ class OpenAICompatibleProvider:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
+        self.last_usage: dict[str, int] = {}
+        self.last_request_id: str | None = None
 
     def explain(self, context: CoachingContext) -> CoachingExplanation:
+        self.last_usage = {}
+        self.last_request_id = None
         system = (
             "You are a chess coach. Stockfish facts are authoritative. "
             "Explain the concept for the player's level. Never contradict the provided best move or evaluation. "
@@ -31,7 +37,17 @@ class OpenAICompatibleProvider:
             },
             timeout=self.timeout,
         )
+        self.last_request_id = response.headers.get("x-request-id") or response.headers.get("request-id")
         response.raise_for_status()
         payload = response.json()
+        usage = payload.get("usage")
+        if isinstance(usage, dict):
+            self.last_usage = {
+                key: int(value)
+                for key, value in usage.items()
+                if key in {"prompt_tokens", "completion_tokens", "total_tokens", "input_tokens", "output_tokens"}
+                and isinstance(value, int)
+                and value >= 0
+            }
         content = payload["choices"][0]["message"]["content"]
         return CoachingExplanation.model_validate_json(content)
