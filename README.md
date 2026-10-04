@@ -40,6 +40,7 @@ The repository now includes the core end-to-end coaching loop rather than a UI-o
 - idempotent weekly progress reports with in-app notifications, read state and scheduled email delivery
 - web admin operations dashboard with account controls, system metrics and audited runtime feature flags
 - automated Playwright browser E2E plus real Android-emulator Flutter integration tests against PostgreSQL/Redis/FastAPI
+- guarded, deterministic portfolio-demo seeding plus a screenshot and walkthrough runbook
 
 ## Architecture
 
@@ -61,6 +62,10 @@ Liveness: `http://localhost:8000/health`
 Readiness: `http://localhost:8000/health/ready`  
 Web: `http://localhost:3000`
 
+## Portfolio demo
+
+A deterministic demo account can be generated without external chess providers or an LLM. See [`PORTFOLIO_DEMO.md`](PORTFOLIO_DEMO.md) for the guarded seed command, screenshot order, and recommended 60–90 second walkthrough.
+
 ## Main user flow
 
 Register → import PGN → analysis worker processes the game → inspect critical moments and coaching explanations → receive a puzzle generated from the user's own game → solve and grade it → spaced repetition and weakness statistics update → training plan adapts.
@@ -75,8 +80,6 @@ Register → import PGN → analysis worker processes the game → inspect criti
 6. Analytics are generated from persisted player data, not hardcoded demo claims.
 7. Mobile offline writes are queued and synchronized safely when connectivity returns.
 
-## Near-term roadmap
+## Project status
 
-The core coaching loop is implemented and covered by a real browser E2E flow. Remaining product-completeness work is intentionally focused rather than a rewrite:
-
-- seeded portfolio demo data and final screenshot/release presentation polish
+The planned portfolio-completeness scope is implemented. Remaining work is release evidence only: run the demo seed in the chosen showcase environment, capture the documented screenshots, and attach the final artifacts to the release/portfolio entry.
