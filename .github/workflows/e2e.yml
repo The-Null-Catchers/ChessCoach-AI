@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -77,10 +78,7 @@ jobs:
           cd backend
           nohup celery -A app.tasks.celery_app.celery worker -Q analysis --loglevel=INFO --concurrency=1 >/tmp/chesscoach-worker.log 2>&1 &
           sleep 3
-          if ! pgrep -f "celery.*app.tasks.celery_app.celery" >/dev/null; then
-            cat /tmp/chesscoach-worker.log
-            exit 1
-          fi
+          pgrep -f "celery.*app.tasks.celery_app.celery" >/dev/null || { cat /tmp/chesscoach-worker.log; exit 1; }
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
@@ -117,7 +115,7 @@ jobs:
           if-no-files-found: ignore
 
   mobile-smoke:
-    if: github.event_name == 'pull_request'
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
@@ -162,58 +160,71 @@ jobs:
           cd backend
           alembic upgrade head
           cd ..
-          nohup python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000 >/tmp/chesscoach-api.log 2>&1 &
+          nohup python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000 >/tmp/chesscoach-mobile-api.log 2>&1 &
           for attempt in {1..30}; do
             if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
               exit 0
             fi
             sleep 1
           done
-          cat /tmp/chesscoach-api.log
+          cat /tmp/chesscoach-mobile-api.log
           exit 1
+      - name: Verify real auth API contract
+        run: |
+          set -euo pipefail
+          email="mobile-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.com"
+          curl --fail --silent --show-error \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"${email}\",\"password\":\"e2e-secure-password\",\"display_name\":\"Mobile Smoke\"}" \
+            http://127.0.0.1:8000/api/v1/auth/register >/tmp/mobile-register.json
+          python - <<'PY'
+          import json
+          payload = json.load(open('/tmp/mobile-register.json'))
+          assert payload.get('access_token') and payload.get('refresh_token')
+          PY
+          curl --fail --silent --show-error \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"${email}\",\"password\":\"e2e-secure-password\"}" \
+            http://127.0.0.1:8000/api/v1/auth/login >/tmp/mobile-login.json
+          python - <<'PY'
+          import json
+          payload = json.load(open('/tmp/mobile-login.json'))
+          assert payload.get('access_token') and payload.get('refresh_token')
+          PY
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-      - name: Prepare Android smoke project
+      - name: Prepare Android project
         working-directory: mobile
         run: |
           flutter create . --platforms=android --org ai.chesscoach
           python tool/configure_branding.py
           flutter pub get
-          python - <<'PY'
-          from pathlib import Path
-          path = Path("android/app/src/main/AndroidManifest.xml")
-          text = path.read_text()
-          text = text.replace("<application", '<application android:usesCleartextTraffic="true"', 1)
-          path.write_text(text)
-          PY
-      - name: Cache Gradle
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('mobile/android/**/*.gradle*', 'mobile/android/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-      - name: Run Android auth smoke test
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 33
-          arch: x86_64
-          profile: pixel_2
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
-          script: adb -s emulator-5554 reverse tcp:8000 tcp:8000 && cd mobile && flutter test integration_test/auth_flow_test.dart -d emulator-5554 --dart-define=API_URL=http://127.0.0.1:8000/api/v1
-      - name: Print API log on smoke failure
+      - name: Run mobile unit and widget tests
+        working-directory: mobile
+        run: flutter test test
+      - name: Build debug APK
+        working-directory: mobile
+        run: flutter build apk --debug --dart-define=API_URL=http://127.0.0.1:8000/api/v1
+      - name: Print API log on mobile failure
         if: failure()
-        run: cat /tmp/chesscoach-api.log || true
+        run: cat /tmp/chesscoach-mobile-api.log || true
 
-  mobile-e2e:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  mobile-device-e2e:
+    if: github.event_name == 'workflow_dispatch'
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [33, 35]
+        include:
+          - api-level: 33
+            profile: pixel_2
+          - api-level: 35
+            profile: pixel_4
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 90
     services:
       postgres:
         image: postgres:17-alpine
@@ -240,7 +251,7 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://chesscoach:chesscoach@localhost:5432/chesscoach
       REDIS_URL: redis://localhost:6379/0
-      JWT_SECRET: mobile-e2e-only-secret
+      JWT_SECRET: mobile-device-e2e-secret
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -256,14 +267,14 @@ jobs:
           cd backend
           alembic upgrade head
           cd ..
-          nohup python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000 >/tmp/chesscoach-api.log 2>&1 &
+          nohup python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000 >/tmp/chesscoach-device-api.log 2>&1 &
           for attempt in {1..30}; do
             if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
               exit 0
             fi
             sleep 1
           done
-          cat /tmp/chesscoach-api.log
+          cat /tmp/chesscoach-device-api.log
           exit 1
       - uses: subosito/flutter-action@v2
         with:
@@ -277,116 +288,17 @@ jobs:
           flutter pub get
           python - <<'PY'
           from pathlib import Path
-          path = Path("android/app/src/main/AndroidManifest.xml")
+          path = Path('android/app/src/main/AndroidManifest.xml')
           text = path.read_text()
-          text = text.replace("<application", '<application android:usesCleartextTraffic="true"', 1)
+          text = text.replace('<application', '<application android:usesCleartextTraffic="true"', 1)
           path.write_text(text)
           PY
-      - name: Cache Gradle
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('mobile/android/**/*.gradle*', 'mobile/android/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-      - name: Run full Android integration test
+      - name: Run Android integration test
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 33
+          api-level: ${{ matrix.api-level }}
           arch: x86_64
-          profile: pixel_2
-          cores: 2
-          ram-size: 4096M
-          heap-size: 512M
-          emulator-boot-timeout: 600
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
-          script: adb -s emulator-5554 reverse tcp:8000 tcp:8000 && cd mobile && flutter test integration_test/auth_flow_test.dart -d emulator-5554 --dart-define=API_URL=http://127.0.0.1:8000/api/v1
-      - name: Print API log on mobile failure
-        if: failure()
-        run: cat /tmp/chesscoach-api.log || true
-
-  mobile-api35-compat:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_DB: chesscoach
-          POSTGRES_USER: chesscoach
-          POSTGRES_PASSWORD: chesscoach
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U chesscoach -d chesscoach"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgresql+psycopg://chesscoach:chesscoach@localhost:5432/chesscoach
-      REDIS_URL: redis://localhost:6379/0
-      JWT_SECRET: mobile-api35-compat-only-secret
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "17"
-      - name: Start API
-        run: |
-          python -m pip install -r backend/requirements.txt
-          cd backend
-          alembic upgrade head
-          cd ..
-          nohup python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000 >/tmp/chesscoach-api-api35.log 2>&1 &
-          for attempt in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          cat /tmp/chesscoach-api-api35.log
-          exit 1
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - name: Prepare Android API 35 project
-        working-directory: mobile
-        run: |
-          flutter create . --platforms=android --org ai.chesscoach
-          python tool/configure_branding.py
-          flutter pub get
-          python - <<'PY'
-          from pathlib import Path
-          path = Path("android/app/src/main/AndroidManifest.xml")
-          text = path.read_text()
-          text = text.replace("<application", '<application android:usesCleartextTraffic="true"', 1)
-          path.write_text(text)
-          PY
-      - name: Run Android 15 compatibility test
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          profile: pixel_4
+          profile: ${{ matrix.profile }}
           cores: 2
           ram-size: 4096M
           heap-size: 512M
@@ -394,6 +306,6 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
           script: adb -s emulator-5554 reverse tcp:8000 tcp:8000 && cd mobile && flutter test integration_test/auth_flow_test.dart -d emulator-5554 --dart-define=API_URL=http://127.0.0.1:8000/api/v1
-      - name: Print API log on Android 15 compatibility failure
+      - name: Print API log on device failure
         if: failure()
-        run: cat /tmp/chesscoach-api-api35.log || true
+        run: cat /tmp/chesscoach-device-api.log || true

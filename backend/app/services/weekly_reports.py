@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.entities import Notification, PlayerInsight, PlayerWeakness, TrainingSession, WeeklyReport
 from app.services.player_analytics import compute_overview
+from app.services.push_notifications import queue_notification_deliveries
 
 
 def week_bounds(now: datetime | None = None) -> tuple[datetime, datetime]:
@@ -85,15 +86,17 @@ def build_weekly_report(db: Session, user_id: str, *, now: datetime | None = Non
     db.add(report)
     db.flush()
 
-    db.add(Notification(
+    notification = Notification(
         user_id=user_id,
         kind="weekly_report_ready",
         title="Your weekly chess report is ready",
         body="Review your progress, recurring weaknesses and training consistency from this week.",
         entity_type="weekly_report",
         entity_id=report.id,
-    ))
+    )
+    db.add(notification)
     db.flush()
+    queue_notification_deliveries(db, notification)
     return report
 
 

@@ -29,6 +29,7 @@ The repository now includes the core end-to-end coaching loop rather than a UI-o
 - Next.js dashboard, auth, import, game library, rich game review with evaluation graph/critical moments/MultiPV, puzzles, training and analytics
 - Flutter/Riverpod app with real API auth, offline caches, queued offline puzzle attempts and dark mode
 - interactive Flutter chessboard with legal moves, tap/drag movement, promotion, board flip and review navigation
+- device push-subscription API plus transactional delivery outbox, bounded Celery retries and provider-neutral webhook delivery for FCM/APNs gateways
 - Docker Compose for PostgreSQL, Redis, API, worker and web
 - CI for backend, web, Flutter tests/builds and Docker validation
 - CI security gates for Python/Node dependencies plus repository vulnerability, secret and misconfiguration scanning
@@ -77,6 +78,5 @@ Register → import PGN → analysis worker processes the game → inspect criti
 
 The core coaching loop is implemented and covered by a real browser E2E flow. Remaining product-completeness work is intentionally focused rather than a rewrite:
 
-- push-notification delivery abstraction
 - richer AI/provider usage accounting and operations telemetry
 - seeded portfolio demo data and final screenshot/release presentation polish
