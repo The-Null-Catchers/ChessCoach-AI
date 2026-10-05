@@ -40,7 +40,6 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://chesscoach:chesscoach@localhost:5432/chesscoach
       REDIS_URL: redis://localhost:6379/0
-      JWT_SECRET: portfolio-evidence-only-secret
       CORS_ORIGINS: http://127.0.0.1:3000
       NEXT_PUBLIC_API_URL: http://127.0.0.1:8000/api/v1
       E2E_WEB_URL: http://127.0.0.1:3000
@@ -54,9 +53,12 @@ jobs:
           set -euo pipefail
           email="portfolio-evidence-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@chesscoach.local"
           password="$(openssl rand -hex 24)"
+          jwt_secret="$(openssl rand -hex 32)"
           echo "::add-mask::${password}"
+          echo "::add-mask::${jwt_secret}"
           echo "PORTFOLIO_DEMO_EMAIL=${email}" >> "$GITHUB_ENV"
           echo "PORTFOLIO_DEMO_PASSWORD=${password}" >> "$GITHUB_ENV"
+          echo "JWT_SECRET=${jwt_secret}" >> "$GITHUB_ENV"
 
       - uses: actions/setup-python@v7
         with:
@@ -68,8 +70,8 @@ jobs:
           python -m pip install -r backend/requirements.txt
           cd backend
           alembic upgrade head
-          ALLOW_PORTFOLIO_DEMO_SEED=true python scripts/seed_portfolio_demo.py
-          ALLOW_PORTFOLIO_DEMO_ADMIN=true python scripts/enable_portfolio_demo_admin.py
+          PYTHONPATH=. ALLOW_PORTFOLIO_DEMO_SEED=true python scripts/seed_portfolio_demo.py
+          PYTHONPATH=. ALLOW_PORTFOLIO_DEMO_ADMIN=true python scripts/enable_portfolio_demo_admin.py
 
       - name: Start API
         run: |
