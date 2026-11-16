@@ -12,7 +12,8 @@ concurrency:
 
 jobs:
   capture:
-    runs-on: ubuntu-latest
+    # Keep the pinned Playwright browser compatible with the runner OS.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
       postgres:
