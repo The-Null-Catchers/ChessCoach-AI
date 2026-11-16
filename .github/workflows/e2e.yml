@@ -194,6 +194,8 @@ jobs:
           PY
       - uses: subosito/flutter-action@v2
         with:
+          # Match the SDK verified by the last passing CI run.
+          flutter-version: '3.47.7'
           channel: stable
           cache: true
       - name: Prepare Android project
@@ -279,6 +281,8 @@ jobs:
           exit 1
       - uses: subosito/flutter-action@v2
         with:
+          # Match the SDK verified by the last passing CI run.
+          flutter-version: '3.47.7'
           channel: stable
           cache: true
       - name: Prepare Android project
