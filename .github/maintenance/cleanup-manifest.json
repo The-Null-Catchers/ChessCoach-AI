@@ -1,0 +1,47 @@
+{
+  "repository": "The-Null-Catchers/ChessCoach-AI",
+  "defaultBranch": "main",
+  "baseSHA": "1ed611d9f66881f3b914c369bd2802a0a72912a6",
+  "backupTag": "cleanup-backup-2026-11-16",
+  "delete": [
+    {
+      "name": "feat/portfolio-demo-data-20261004",
+      "sha": "68906751355051cf3216fee0ac23e5a99dd19c03",
+      "reason": "ancestor"
+    },
+    {
+      "name": "feat/portfolio-demo-seed-20261004",
+      "sha": "02376eefd5312f1b1a4005ce49c2a612ba12e761",
+      "reason": "ancestor"
+    },
+    {
+      "name": "feat/weakness-history-trends-20261003",
+      "sha": "7d8b6258d1dc782c05f8239176c8d33b65cc8009",
+      "reason": "ancestor"
+    },
+    {
+      "name": "fix/ci-debug-apk-local-api-20261011",
+      "sha": "59269068e62e00e92bd180b590adbf48ee2c1cdd",
+      "reason": "equivalent"
+    },
+    {
+      "name": "fix/e2e-emulator-stability-20260928",
+      "sha": "ba473597a53f20c986cdaf1214b12bcb28d064ab",
+      "reason": "equivalent"
+    },
+    {
+      "name": "fix/portfolio-evidence-pythonpath-20261005",
+      "sha": "24da77b276912b032445f9fee05b6d91c1f7471b",
+      "reason": "equivalent"
+    }
+  ],
+  "status": "Explicit user approval received: archive then delete audited SHAs",
+  "archiveParents": [
+    "68906751355051cf3216fee0ac23e5a99dd19c03",
+    "02376eefd5312f1b1a4005ce49c2a612ba12e761",
+    "7d8b6258d1dc782c05f8239176c8d33b65cc8009",
+    "59269068e62e00e92bd180b590adbf48ee2c1cdd",
+    "ba473597a53f20c986cdaf1214b12bcb28d064ab",
+    "24da77b276912b032445f9fee05b6d91c1f7471b"
+  ]
+}
