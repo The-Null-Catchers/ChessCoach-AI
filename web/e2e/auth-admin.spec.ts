@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { createHash } from "node:crypto";
+import { captureEvidence, evidenceEnabled, recordEvidence } from "./evidence";
 
 test("registers, opens the game library, and reaches admin operations", async ({ page }) => {
   await page.goto("/login");
@@ -42,7 +44,7 @@ test("runs the critical coaching loop from PGN import through puzzle mastery", a
   await page.goto("/import");
   await page.getByLabel("Your chess username or PGN player name").fill("E2E Player");
   await page.getByLabel("Analysis strength").selectOption("normal");
-  await page.locator('textarea[name="pgn"]').fill(`[Event "Critical Coaching E2E"]
+  const pgn = `[Event "Critical Coaching E2E"]
 [Site "CI"]
 [Date "2026.10.01"]
 [Round "1"]
@@ -51,11 +53,14 @@ test("runs the critical coaching loop from PGN import through puzzle mastery", a
 [Result "0-1"]
 [TimeControl "300+0"]
 
-1. f3 e5 2. g4 Qh4# 0-1`);
+1. f3 e5 2. g4 Qh4# 0-1`;
+  await page.locator('textarea[name="pgn"]').fill(pgn);
+  const analysisStarted = Date.now();
   await page.getByRole("button", { name: "Analyze PGN" }).click();
 
   await expect(page.getByText("Queued for analysis")).toBeVisible();
   await expect(page.getByText(/Analysis: complete · 100%/)).toBeVisible({ timeout: 90_000 });
+  const importToCompletionMs = Date.now() - analysisStarted;
 
   const gameLink = page.getByRole("link", { name: "Open game" }).first();
   const href = await gameLink.getAttribute("href");
@@ -79,9 +84,17 @@ test("runs the critical coaching loop from PGN import through puzzle mastery", a
   const analysis = await analysisResponse.json() as {
     moves: Array<{
       fen_before: string;
-      analysis: null | { best_move: string | null; classification: string };
+      analysis: null | { best_move: string | null; classification: string; depth: number; profile: string };
     }>;
   };
+  expect(analysis.moves).toHaveLength(4);
+  for (const move of analysis.moves) {
+    expect(move.analysis).not.toBeNull();
+    expect(move.analysis!.depth).toBeGreaterThan(0);
+    expect(move.analysis!.profile).toBe("normal");
+  }
+  await expect(page.getByRole("img", { name: "Engine evaluation graph" })).toBeVisible();
+  await captureEvidence(page, "09-real-stockfish-review");
 
   const puzzlesResponse = await page.request.get(`${apiBase}/puzzles?limit=20`, { headers });
   expect(puzzlesResponse.ok()).toBeTruthy();
@@ -101,9 +114,11 @@ test("runs the critical coaching loop from PGN import through puzzle mastery", a
 
   await page.goto("/puzzles");
   await expect(page.getByRole("heading", { name: "Find the move you missed" })).toBeVisible();
+  await captureEvidence(page, "10-real-game-puzzle");
   await page.getByRole("button", { name: from }).click();
   await page.getByRole("button", { name: to }).click();
   await expect(page.getByText("Correct. How difficult was this recall?")).toBeVisible();
+  await captureEvidence(page, "11-real-puzzle-solved");
   await page.getByRole("button", { name: "Good" }).click();
   await expect(page.getByText("Correct. How difficult was this recall?")).not.toBeVisible();
 
@@ -115,4 +130,23 @@ test("runs the critical coaching loop from PGN import through puzzle mastery", a
   };
   expect(training.reviewed_puzzles).toBeGreaterThanOrEqual(1);
   expect(training.puzzle_mastery).toBeGreaterThan(0);
+
+  await page.goto("/training");
+  await expect(page.locator(".training-summary")).toBeVisible();
+  await captureEvidence(page, "12-real-training-after-review");
+  if (evidenceEnabled) {
+    expect(process.env.PORTFOLIO_ENGINE_NAME).toMatch(/Stockfish/i);
+  }
+  recordEvidence("real-analysis", {
+    scenario: "PGN import -> Stockfish worker -> game review -> personal puzzle -> persisted mastery",
+    data_origin: "fresh synthetic four-ply PGN, analyzed by the real engine; not demo seed",
+    engine_name: process.env.PORTFOLIO_ENGINE_NAME ?? null,
+    ai_provider: "template",
+    pgn_sha256: createHash("sha256").update(pgn).digest("hex"),
+    import_to_completion_ms: importToCompletionMs,
+    analysis: analysis.moves.map((move) => move.analysis),
+    puzzle_source_matches_import: puzzle!.source_game_id === gameId,
+    reviewed_puzzles: training.reviewed_puzzles,
+    puzzle_mastery: training.puzzle_mastery,
+  });
 });

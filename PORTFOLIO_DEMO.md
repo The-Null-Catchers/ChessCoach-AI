@@ -2,6 +2,8 @@
 
 This runbook creates a deterministic, presentation-ready account without depending on Lichess, Chess.com, Stockfish, an LLM, SMTP, or push providers at demo time.
 
+The historical progress in this seeded account is synthetic presentation data. For separate proof of live PGN import, Stockfish worker analysis, puzzle generation and persisted mastery, run the [Portfolio Evidence workflow](PORTFOLIO_EVIDENCE.md). It captures both stories and labels their provenance independently.
+
 ## 1. Apply migrations
 
 From the repository root:

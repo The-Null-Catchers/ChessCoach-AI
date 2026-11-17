@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { recordEvidence } from "./evidence";
 
 const enabled = process.env.PORTFOLIO_EVIDENCE === "true";
 const email = process.env.PORTFOLIO_DEMO_EMAIL ?? "";
@@ -18,7 +19,7 @@ async function capture(page: import("@playwright/test").Page, name: string) {
 }
 
 test.describe("portfolio evidence", () => {
-  test.skip(!enabled, "Run only from the manual portfolio-evidence workflow.");
+  test.skip(!enabled, "Run only from the portfolio-evidence workflow.");
 
   test.beforeEach(() => {
     mkdirSync(evidenceDir, { recursive: true });
@@ -46,19 +47,20 @@ test.describe("portfolio evidence", () => {
     const reviewHref = await page.locator('a[href^="/games/"]').first().getAttribute("href");
     expect(reviewHref).toBeTruthy();
     await page.goto(reviewHref!);
-    await expect(page.locator("main")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Learn from the critical moments" })).toBeVisible();
+    await expect(page.getByRole("img", { name: "Engine evaluation graph" })).toBeVisible();
     await capture(page, "03-game-review");
 
     await page.goto("/analytics");
-    await expect(page.locator("main")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Recurring weaknesses" })).toBeVisible();
     await capture(page, "04-analytics-and-weakness-history");
 
     await page.goto("/training");
-    await expect(page.locator("main")).toBeVisible();
+    await expect(page.locator(".training-summary")).toBeVisible();
     await capture(page, "05-training-plan");
 
     await page.goto("/puzzles");
-    await expect(page.locator("main")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Find the move you missed" })).toBeVisible();
     await capture(page, "06-personal-puzzles");
 
     await page.goto("/admin");
@@ -71,5 +73,11 @@ test.describe("portfolio evidence", () => {
     await page.goto("/");
     await expect(page.getByText("CURRENT COACHING FOCUS")).toBeVisible();
     await capture(page, "08-dashboard-mobile");
+    recordEvidence("seeded-story", {
+      data_origin: "deterministic portfolio demo seed, including synthetic historical progress",
+      real_engine_analysis: false,
+      screenshots: 8,
+      note: "These presentation images do not prove live Stockfish or hosted AI execution. See real-analysis.json for the separate live-engine scenario.",
+    });
   });
 });
