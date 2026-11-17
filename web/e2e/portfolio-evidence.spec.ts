@@ -26,6 +26,7 @@ test.describe("portfolio evidence", () => {
   });
 
   test("captures the seeded coaching story", async ({ page }) => {
+    test.setTimeout(120_000);
     expect(email).not.toBe("");
     expect(password).not.toBe("");
 

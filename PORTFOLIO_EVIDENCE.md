@@ -7,6 +7,7 @@ ChessCoach AI includes a GitHub Actions workflow named **Portfolio Evidence** th
 1. Starts isolated PostgreSQL and Redis services on the GitHub-hosted runner.
 2. Applies Alembic migrations.
 3. Generates a random, masked password for an ephemeral demo account.
+   Its address uses `example.com`, which is accepted by the same email validation used for sign-in; local-only `.local` addresses are rejected by the API.
 4. Runs the guarded `seed_portfolio_demo.py` script.
 5. Grants admin access only after a second explicit guard verifies the account contains `portfolio_demo` games.
 6. Starts the FastAPI and Next.js applications locally on the runner.

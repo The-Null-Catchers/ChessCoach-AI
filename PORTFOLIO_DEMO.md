@@ -20,7 +20,7 @@ Choose a password locally. The seed command is intentionally guarded so it canno
 ```bash
 cd backend
 ALLOW_PORTFOLIO_DEMO_SEED=true \
-PORTFOLIO_DEMO_EMAIL=demo@chesscoach.local \
+PORTFOLIO_DEMO_EMAIL=demo@chesscoach.example.com \
 PORTFOLIO_DEMO_PASSWORD='choose-a-local-demo-password' \
 python scripts/seed_portfolio_demo.py
 ```

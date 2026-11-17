@@ -2,6 +2,18 @@ import { expect, test } from "@playwright/test";
 import { createHash } from "node:crypto";
 import { captureEvidence, evidenceEnabled, recordEvidence } from "./evidence";
 
+test("shows structured sign-in validation errors without crashing", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill("invalid@chesscoach.local");
+  await page.getByLabel("Password").fill("e2e-secure-password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.locator(".form-error")).toHaveText("Check your email address and password, then try again.");
+  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+  await page.getByLabel("Email").fill("missing-e2e-user@example.com");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.locator(".form-error")).toHaveText("Invalid credentials");
+});
+
 test("registers, opens the game library, and reaches admin operations", async ({ page }) => {
   await page.goto("/login");
 

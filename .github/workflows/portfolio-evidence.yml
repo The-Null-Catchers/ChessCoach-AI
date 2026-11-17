@@ -69,7 +69,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          email="portfolio-evidence-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@chesscoach.local"
+          email="portfolio-evidence-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.com"
           password="$(openssl rand -hex 24)"
           jwt_secret="$(openssl rand -hex 32)"
           echo "::add-mask::${password}"

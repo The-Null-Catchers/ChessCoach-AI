@@ -21,8 +21,10 @@ export default function LoginPage() {
       body: JSON.stringify(body),
     });
     if (!response.ok) {
-      const detail = await response.json().catch(() => ({ detail: "Authentication failed" })) as { detail?: string };
-      setMessage(detail.detail ?? "Authentication failed");
+      const detail = await response.json().catch(() => ({ detail: "Authentication failed" })) as { detail?: unknown };
+      setMessage(typeof detail.detail === "string"
+        ? detail.detail
+        : "Check your email address and password, then try again.");
       return;
     }
     const tokens = await response.json() as { access_token: string; refresh_token: string };
