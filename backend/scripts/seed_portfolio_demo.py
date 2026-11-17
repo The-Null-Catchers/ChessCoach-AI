@@ -27,7 +27,7 @@ from app.models.entities import (
 from app.models.weakness_history import WeaknessSnapshot
 from app.services.pgn import parse_pgn_many
 
-DEMO_EMAIL = os.getenv("PORTFOLIO_DEMO_EMAIL", "demo@chesscoach.local").strip().lower()
+DEMO_EMAIL = os.getenv("PORTFOLIO_DEMO_EMAIL", "demo@chesscoach.example.com").strip().lower()
 DEMO_PASSWORD = os.getenv("PORTFOLIO_DEMO_PASSWORD", "")
 ALLOW_SEED = os.getenv("ALLOW_PORTFOLIO_DEMO_SEED", "").lower() in {"1", "true", "yes"}
 
