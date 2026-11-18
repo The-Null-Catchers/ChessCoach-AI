@@ -113,7 +113,7 @@ export default function Home() {
     <section className="analytics-cards">
       <div className="card"><span>Rating</span><strong>{analytics?.rating ?? "—"}</strong><small>Profile rating</small></div>
       <div className="card"><span>Linked analyzed games</span><strong>{analytics?.overview.games_analyzed ?? 0}</strong><small>Only your identified side</small></div>
-      <div className="card"><span>Estimated accuracy</span><strong>{analytics?.overview.accuracy == null ? "—" : analytics.overview.accuracy.toFixed(1) + "%"}</strong><small>Consistent CPL-derived metric</small></div>
+      <div className="card"><span>Estimated accuracy</span><strong>{analytics?.overview.accuracy == null ? "—" : analytics.overview.accuracy.toFixed(1) + "%"}</strong><small>Based on engine loss and mate decisions</small></div>
       <div className="card"><span>Due puzzles</span><strong>{training?.due_reviews ?? 0}</strong><small>Spaced repetition queue</small></div>
     </section>
 
