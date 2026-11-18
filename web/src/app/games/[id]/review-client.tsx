@@ -14,6 +14,8 @@ type Candidate = {
 type Analysis = {
   before_cp: number | null;
   after_cp: number | null;
+  mate_after?: number | null;
+  checkmate?: boolean;
   cpl: number | null;
   classification: string;
   best_move: string | null;
@@ -38,7 +40,7 @@ type CriticalMoment = {
   ply: number;
   san: string;
   classification: string;
-  cpl: number;
+  cpl: number | null;
 };
 
 type GameAnalysis = {
@@ -124,39 +126,42 @@ function EvaluationGraph({
   selectedPly: number;
   onSelect: (ply: number) => void;
 }) {
-  const graph = moves
-    .filter((item) => item.analysis?.after_cp !== null && item.analysis?.after_cp !== undefined)
-    .map((item) => {
-      const raw = item.analysis!.after_cp!;
-      const whitePerspective = item.ply % 2 === 1 ? raw : -raw;
-      return { ply: item.ply, value: Math.max(-800, Math.min(800, whitePerspective)) };
-    });
+  const graph = moves.flatMap((item) => {
+    if (!item.analysis) return [];
+    const { after_cp, mate_after, checkmate } = item.analysis;
+    const label = checkmate ? "Checkmate" : mate_after != null ? `M${mate_after}` : evaluationLabel(after_cp);
+    let raw = after_cp;
+    if (checkmate) raw = 800;
+    else if (mate_after != null) raw = Math.sign(mate_after) * 800;
+    if (raw === null) return [];
+    const whitePerspective = item.ply % 2 === 1 ? raw : -raw;
+    return [{ ply: item.ply, label, value: Math.max(-800, Math.min(800, whitePerspective)) }];
+  });
 
-  if (graph.length < 2) {
-    return <p className="muted">The evaluation graph will appear when enough analyzed moves are available.</p>;
+  if (graph.length === 0) {
+    return <p className="muted">The evaluation graph will appear when analyzed moves are available.</p>;
   }
 
   const width = 600;
   const height = 170;
-  const x = (index: number) => (index / Math.max(1, graph.length - 1)) * width;
+  const x = (ply: number) => (ply / Math.max(1, moves.at(-1)?.ply ?? 1)) * width;
   const y = (value: number) => height / 2 - (value / 800) * (height / 2 - 14);
-  const points = graph.map((item, index) => `${x(index)},${y(item.value)}`).join(" ");
-  const selectedIndex = Math.max(0, graph.findIndex((item) => item.ply === selectedPly));
-  const selectedX = x(selectedIndex);
+  const points = graph.map((item) => `${x(item.ply)},${y(item.value)}`).join(" ");
+  const selectedX = x(selectedPly);
 
   return <div className="eval-graph-wrap">
     <svg className="eval-graph" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Engine evaluation graph">
       <line x1="0" y1={height / 2} x2={width} y2={height / 2} className="eval-zero" />
       <polyline points={points} className="eval-line" />
       <line x1={selectedX} y1="0" x2={selectedX} y2={height} className="eval-cursor" />
-      {graph.map((item, index) => <circle
+      {graph.map((item) => <circle
         key={item.ply}
-        cx={x(index)}
+        cx={x(item.ply)}
         cy={y(item.value)}
         r={item.ply === selectedPly ? 5 : 2.5}
         className={item.ply === selectedPly ? "eval-dot active" : "eval-dot"}
         onClick={() => onSelect(item.ply)}
-      />)}
+      ><title>{`Ply ${item.ply}: ${item.label}`}</title></circle>)}
     </svg>
     <div className="eval-legend"><span>White advantage</span><span>Equal</span><span>Black advantage</span></div>
   </div>;
@@ -244,7 +249,7 @@ export default function GameReviewClient({ gameId }: { gameId: string }) {
           onClick={() => setSelectedPly(item.ply)}
         >
           <b>{item.ply}. {item.san}</b>
-          <span>{item.classification} · {item.cpl} CPL</span>
+          <span>{item.classification}{item.cpl != null && ` · ${item.cpl} CPL`}</span>
         </button>)}
       </div>}
     </section>
@@ -257,7 +262,8 @@ export default function GameReviewClient({ gameId }: { gameId: string }) {
         <div className="panel">
           <div className="move-heading">
             <div><small>Selected move</small><h2>{move ? `${move.ply}. ${move.san}` : "Starting position"}</h2></div>
-            <strong>{evaluationLabel(move?.analysis?.after_cp ?? null)}</strong>
+            <strong>{move?.analysis?.checkmate ? "Checkmate" : move?.analysis?.mate_after != null
+              ? `M${move.analysis.mate_after}` : evaluationLabel(move?.analysis?.after_cp ?? null)}</strong>
           </div>
           {move?.analysis && <div className="analysis-facts">
             <span className={`classification ${move.analysis.classification}`}>{move.analysis.classification}</span>
@@ -304,7 +310,7 @@ export default function GameReviewClient({ gameId }: { gameId: string }) {
           key={item.move_id}
           className="critical-chip positive"
           onClick={() => setSelectedPly(item.ply)}
-        ><b>{item.ply}. {item.san}</b><span>{item.classification} · {item.cpl} CPL</span></button>)}
+        ><b>{item.ply}. {item.san}</b><span>{item.classification}{item.cpl != null && ` · ${item.cpl} CPL`}</span></button>)}
       </div>
     </section>}
   </main>;

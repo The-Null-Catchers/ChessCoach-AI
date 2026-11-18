@@ -34,6 +34,23 @@ def accuracy_from_cpl(values: list[int]) -> float:
     return round(100.0 * math.exp(-mean_cpl / 350.0), 2)
 
 
+def accuracy_loss(analysis: EngineAnalysis) -> int | None:
+    """Return a scoring input, not a measured centipawn loss."""
+    if analysis.mate_before is not None or analysis.mate_after is not None:
+        return {"blunder": 350, "mistake": 150}.get(analysis.classification, 0)
+    return analysis.centipawn_loss
+
+
+def _sample_accuracy(rows: list[tuple[Move, EngineAnalysis]]) -> float | None:
+    losses = [loss for _, analysis in rows if (loss := accuracy_loss(analysis)) is not None]
+    return accuracy_from_cpl(losses) if losses else None
+
+
+def _average_sample_accuracy(samples: list[dict[str, object]]) -> float | None:
+    values = [value for sample in samples if isinstance(value := sample["accuracy"], (int, float))]
+    return round(sum(values) / len(values), 2) if values else None
+
+
 def _is_player_ply(ply: int, color: str) -> bool:
     return (ply % 2 == 1 and color == "white") or (ply % 2 == 0 and color == "black")
 
@@ -111,12 +128,11 @@ def recompute_player_analytics(db: Session, user_id: str) -> None:
     for game, player in linked:
         color = player.color
         opening_rows = _analysis_rows(db, game.id, color, end_ply=20)
-        opening_cpl = [a.centipawn_loss or 0 for _, a in opening_rows]
         first_error = next((m.ply for m, a in opening_rows if a.classification in ERROR_CLASSES), None)
         opening_key = (game.eco or "", game.opening or "Unknown opening", game.variation or "", color)
         game_score = _score_for_result(game.result, color)
         opening_groups[opening_key].append({
-            "accuracy": accuracy_from_cpl(opening_cpl),
+            "accuracy": _sample_accuracy(opening_rows),
             "score": game_score,
             "first_error": first_error,
         })
@@ -128,10 +144,9 @@ def recompute_player_analytics(db: Session, user_id: str) -> None:
             category, start_ply = entry
             rows = _analysis_rows(db, game.id, color, start_ply=start_ply)
             if rows:
-                cpl = [a.centipawn_loss or 0 for _, a in rows]
                 errors = sum(a.classification in ERROR_CLASSES for _, a in rows)
                 endgame_groups[category].append({
-                    "accuracy": accuracy_from_cpl(cpl),
+                    "accuracy": _sample_accuracy(rows),
                     "mistakes": errors,
                 })
 
@@ -152,7 +167,7 @@ def recompute_player_analytics(db: Session, user_id: str) -> None:
             wins=wins,
             draws=draws,
             losses=losses,
-            avg_accuracy=round(sum(float(s["accuracy"]) for s in samples) / len(samples), 2),
+            avg_accuracy=_average_sample_accuracy(samples),
             common_deviation_ply=round(median(errors)) if errors else None,
             updated_at=datetime.utcnow(),
         )
@@ -165,7 +180,7 @@ def recompute_player_analytics(db: Session, user_id: str) -> None:
             user_id=user_id,
             category=category,
             games_count=len(samples),
-            avg_accuracy=round(sum(float(s["accuracy"]) for s in samples) / len(samples), 2),
+            avg_accuracy=_average_sample_accuracy(samples),
             mistakes=sum(int(s["mistakes"]) for s in samples),
             updated_at=datetime.utcnow(),
         )
@@ -206,7 +221,7 @@ def recompute_player_analytics(db: Session, user_id: str) -> None:
                 evidence_json=json.dumps({"white_score_rate": white_rate, "black_score_rate": black_rate}),
             ))
 
-    eligible_endgames = [stat for stat in endgame_stats if stat.games_count >= 3]
+    eligible_endgames = [stat for stat in endgame_stats if stat.games_count >= 3 and stat.avg_accuracy is not None]
     if eligible_endgames:
         weakest = min(eligible_endgames, key=lambda stat: stat.avg_accuracy)
         db.add(PlayerInsight(
@@ -218,7 +233,7 @@ def recompute_player_analytics(db: Session, user_id: str) -> None:
             evidence_json=json.dumps({"category": weakest.category, "games": weakest.games_count, "accuracy": weakest.avg_accuracy}),
         ))
 
-    review_openings = [stat for stat in opening_stats if stat.games_count >= 3]
+    review_openings = [stat for stat in opening_stats if stat.games_count >= 3 and stat.avg_accuracy is not None]
     if review_openings:
         weakest_opening = min(review_openings, key=lambda stat: stat.avg_accuracy)
         if weakest_opening.avg_accuracy < 82:
@@ -248,6 +263,7 @@ def compute_overview(db: Session, user_id: str) -> dict[str, object]:
     ).all()
 
     all_cpl: list[int] = []
+    all_losses: list[int] = []
     phase_cpl: dict[str, list[int]] = {"opening": [], "middlegame": [], "endgame": []}
     blunders = 0
     mistakes = 0
@@ -258,25 +274,30 @@ def compute_overview(db: Session, user_id: str) -> dict[str, object]:
         endgame_start = endgame[1] if endgame else None
         rows = _analysis_rows(db, game.id, player.color)
         for move, analysis in rows:
-            cpl = analysis.centipawn_loss or 0
-            all_cpl.append(cpl)
+            cpl = analysis.centipawn_loss
+            if cpl is not None:
+                all_cpl.append(cpl)
             if analysis.classification == "blunder":
                 blunders += 1
             if analysis.classification in {"mistake", "blunder"}:
                 mistakes += 1
+            loss = accuracy_loss(analysis)
+            if loss is None:
+                continue
+            all_losses.append(loss)
             if move.ply <= 20:
-                phase_cpl["opening"].append(cpl)
+                phase_cpl["opening"].append(loss)
             elif endgame_start is not None and move.ply >= endgame_start:
-                phase_cpl["endgame"].append(cpl)
+                phase_cpl["endgame"].append(loss)
             else:
-                phase_cpl["middlegame"].append(cpl)
+                phase_cpl["middlegame"].append(loss)
 
     return {
         "games_analyzed": games,
         "average_centipawn_loss": round(sum(all_cpl) / len(all_cpl), 2) if all_cpl else None,
         "blunders_per_game": round(blunders / games, 2) if games else 0.0,
         "mistakes_per_game": round(mistakes / games, 2) if games else 0.0,
-        "accuracy": accuracy_from_cpl(all_cpl) if all_cpl else None,
+        "accuracy": accuracy_from_cpl(all_losses) if all_losses else None,
         "phase_accuracy": {
             phase: accuracy_from_cpl(values) if values else None
             for phase, values in phase_cpl.items()

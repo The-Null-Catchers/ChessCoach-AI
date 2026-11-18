@@ -159,6 +159,9 @@ class _GameReviewScreenState extends ConsumerState<GameReviewScreen> {
 
   String _evaluation(Map<dynamic, dynamic>? engine, String key) {
     if (engine == null) return '—';
+    if (key == 'after_cp' && engine['checkmate'] == true) return 'Checkmate';
+    final mate = engine[key == 'after_cp' ? 'mate_after' : 'mate_before'];
+    if (mate != null) return 'M$mate';
     final value = engine[key];
     if (value == null) return '—';
     return ((value as num) / 100).toStringAsFixed(2);

@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import chess
 import jwt
 from typing import Literal
 from pydantic import BaseModel
@@ -15,7 +16,7 @@ from app.services.pgn import parse_pgn_many
 from app.services.provider_imports import ProviderImportError, fetch_provider_games, normalize_username
 from app.tasks.analysis import analyze_game
 from app.services.stockfish import analysis_profile
-from app.services.player_analytics import accuracy_from_cpl, classify_endgame
+from app.services.player_analytics import accuracy_from_cpl, accuracy_loss, classify_endgame
 
 router = APIRouter(prefix='/games', tags=['games'])
 
@@ -256,6 +257,9 @@ def game_analysis(game_id: str, user_id: str = Depends(current_user_id), db: Ses
         a = db.scalar(select(EngineAnalysis).where(EngineAnalysis.move_id == m.id))
         out.append({'move_id': m.id, 'ply': m.ply, 'san': m.san, 'uci': m.uci, 'fen_before': m.fen_before, 'fen_after': m.fen_after,
                     'analysis': None if not a else {'before_cp': a.eval_before_cp, 'after_cp': a.eval_after_cp,
+                    'mate_before': a.mate_before, 'mate_after': a.mate_after,
+                    'checkmate': a.mate_after == 0 or (a.mate_after is None and a.eval_after_cp is None
+                                                       and chess.Board(m.fen_after).is_checkmate()),
                     'cpl': a.centipawn_loss, 'classification': a.classification, 'best_move': a.best_move_uci, 'pv': a.pv_uci,
                     'depth': a.depth, 'profile': a.analysis_profile,
                     'candidates': json.loads(a.candidate_moves_json) if a.candidate_moves_json else []}})
@@ -273,6 +277,8 @@ def game_analysis(game_id: str, user_id: str = Depends(current_user_id), db: Ses
 
     phase_cpl = {"opening": [], "middlegame": [], "endgame": []}
     critical_moments = []
+    error_rank = {"inaccuracy": 1, "mistake": 2, "blunder": 3}
+    mate_errors: set[str] = set()
     strongest_moves = []
     missed_wins = 0
     defensive_mistakes = 0
@@ -288,16 +294,20 @@ def game_analysis(game_id: str, user_id: str = Depends(current_user_id), db: Ses
         if not is_player_move:
             continue
 
-        cpl = analysis.centipawn_loss or 0
+        cpl = analysis.centipawn_loss
+        loss = accuracy_loss(analysis)
         if move.ply <= 20:
             phase = "opening"
         elif endgame_start is not None and move.ply >= endgame_start:
             phase = "endgame"
         else:
             phase = "middlegame"
-        phase_cpl[phase].append(cpl)
+        if loss is not None:
+            phase_cpl[phase].append(loss)
 
-        if analysis.classification in {"inaccuracy", "mistake", "blunder"}:
+        if analysis.classification in error_rank:
+            if analysis.mate_before is not None or analysis.mate_after is not None:
+                mate_errors.add(move.id)
             critical_moments.append({
                 "move_id": move.id,
                 "ply": move.ply,
@@ -323,12 +333,20 @@ def game_analysis(game_id: str, user_id: str = Depends(current_user_id), db: Ses
         if (
             analysis.eval_before_cp is not None
             and analysis.eval_before_cp <= -120
+            and cpl is not None
             and cpl >= 80
         ):
             defensive_mistakes += 1
 
-    critical_moments.sort(key=lambda item: item["cpl"], reverse=True)
-    strongest_moves.sort(key=lambda item: (item["cpl"], item["ply"]))
+    critical_moments.sort(
+        key=lambda item: (
+            error_rank[item["classification"]],
+            item["move_id"] in mate_errors,
+            item["cpl"] if item["cpl"] is not None else -1,
+        ),
+        reverse=True,
+    )
+    strongest_moves.sort(key=lambda item: (item["cpl"] is None, item["cpl"] or 0, item["ply"]))
 
     summary = {
         "phase_accuracy": {

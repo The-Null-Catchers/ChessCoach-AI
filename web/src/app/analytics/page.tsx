@@ -11,11 +11,11 @@ type Opening = {
   wins: number;
   draws: number;
   losses: number;
-  average_accuracy: number;
+  average_accuracy: number | null;
   common_deviation_ply: number | null;
 };
 
-type Endgame = { category: string; games: number; average_accuracy: number; mistakes: number };
+type Endgame = { category: string; games: number; average_accuracy: number | null; mistakes: number };
 type Weakness = { category: string; score: number; confidence: number; sample_size: number; trend: number };
 type Insight = { type: string; title: string; body: string; confidence: number; created_at: string };
 type Analytics = {
@@ -69,7 +69,7 @@ export default function AnalyticsPage() {
 
     <div className="analytics-cards">
       <div className="card"><span>Linked games</span><strong>{data.overview.games_analyzed}</strong><small>Analyzed as your color</small></div>
-      <div className="card"><span>Estimated accuracy</span><strong>{pct(data.overview.accuracy)}</strong><small>Derived consistently from CPL</small></div>
+      <div className="card"><span>Estimated accuracy</span><strong>{pct(data.overview.accuracy)}</strong><small>Based on engine loss and mate decisions</small></div>
       <div className="card"><span>Average CPL</span><strong>{data.overview.average_centipawn_loss?.toFixed(1) ?? "—"}</strong><small>Lower is better</small></div>
       <div className="card"><span>Blunders / game</span><strong>{data.overview.blunders_per_game.toFixed(2)}</strong><small>Mistakes {data.overview.mistakes_per_game.toFixed(2)} / game</small></div>
     </div>

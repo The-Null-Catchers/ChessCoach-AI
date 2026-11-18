@@ -108,7 +108,7 @@ class OpeningStat(Base):
     wins: Mapped[int] = mapped_column(Integer, default=0)
     draws: Mapped[int] = mapped_column(Integer, default=0)
     losses: Mapped[int] = mapped_column(Integer, default=0)
-    avg_accuracy: Mapped[float] = mapped_column(Float, default=0)
+    avg_accuracy: Mapped[float | None] = mapped_column(Float, nullable=True)
     common_deviation_ply: Mapped[int | None] = mapped_column(Integer, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -173,7 +173,7 @@ class EndgameStat(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
     category: Mapped[str] = mapped_column(String(64))
     games_count: Mapped[int] = mapped_column(Integer, default=0)
-    avg_accuracy: Mapped[float] = mapped_column(Float, default=0)
+    avg_accuracy: Mapped[float | None] = mapped_column(Float, nullable=True)
     mistakes: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

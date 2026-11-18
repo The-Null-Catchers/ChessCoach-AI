@@ -23,6 +23,9 @@ FastAPI publishes generated OpenAPI at `/openapi.json` and interactive documenta
 - `GET /games`
 - `POST /games/{id}/player`
 - `GET /games/{id}/analysis` — move analysis, MultiPV candidates and game-review summary
+  - `mate_before` and `mate_after` are nullable integers from the mover's perspective. Positive favors the mover, negative favors the opponent, and zero after the move means the mover delivered checkmate. `checkmate` also identifies a terminal checkmate in older analyses without an explicit mate value. The graph uses White's perspective for vertical placement.
+  - `cpl` and average centipawn loss use measured centipawn loss only. Estimated accuracy retains the existing exponential calculation. A mate blunder contributes a scoring weight of 350, a mate mistake 150, and other mate decisions zero. These weights are inputs to accuracy only. Moves without a recorded centipawn loss or mate decision are omitted. A group with no scoreable samples reports null accuracy.
+  - Game and overview accuracy use the stored moves immediately. Opening and endgame summaries are persisted and recalculate when a game is analyzed. To refresh an existing account without running Stockfish, run `python -m scripts.refresh_player_analytics USER_ID` from `backend/` against the upgraded database while analysis for that account is idle.
 - `GET /games/{id}/mistakes`
 - `GET /analysis-jobs/{id}`
 - `GET /analysis-jobs/{id}/events` — Server-Sent Events progress

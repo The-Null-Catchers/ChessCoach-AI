@@ -96,7 +96,15 @@ test("runs the critical coaching loop from PGN import through puzzle mastery", a
   const analysis = await analysisResponse.json() as {
     moves: Array<{
       fen_before: string;
-      analysis: null | { best_move: string | null; classification: string; depth: number; profile: string };
+      analysis: null | {
+        best_move: string | null;
+        classification: string;
+        depth: number;
+        profile: string;
+        cpl: number | null;
+        mate_after: number | null;
+        checkmate: boolean;
+      };
     }>;
   };
   expect(analysis.moves).toHaveLength(4);
@@ -105,7 +113,23 @@ test("runs the critical coaching loop from PGN import through puzzle mastery", a
     expect(move.analysis!.depth).toBeGreaterThan(0);
     expect(move.analysis!.profile).toBe("normal");
   }
-  await expect(page.getByRole("img", { name: "Engine evaluation graph" })).toBeVisible();
+  expect(analysis.moves[2].analysis).toMatchObject({ classification: "blunder", cpl: null, mate_after: -1 });
+  expect(analysis.moves[3].analysis).toMatchObject({ cpl: null, mate_after: 0, checkmate: true });
+  await expect(page.getByRole("button", { name: "Biggest mistake · g4" })).toBeVisible();
+  const graph = page.getByRole("img", { name: "Engine evaluation graph" });
+  await expect(graph.locator("circle")).toHaveCount(4);
+  await expect(graph.locator("title").last()).toHaveText("Ply 4: Checkmate");
+  await expect(page.locator(".move-heading strong")).toHaveText("M-1");
+
+  const analyticsResponse = await page.request.get(`${apiBase}/analytics`, { headers });
+  expect(analyticsResponse.ok()).toBeTruthy();
+  const analytics = await analyticsResponse.json();
+  const measuredLoss = analysis.moves[0].analysis!.cpl!;
+  const expectedAccuracy = Number((100 * Math.exp(-(measuredLoss + 350) / 700)).toFixed(2));
+  expect(analytics.overview.average_centipawn_loss).toBe(measuredLoss);
+  expect(analytics.overview.accuracy).toBe(expectedAccuracy);
+  expect(analytics.overview.phase_accuracy.opening).toBe(expectedAccuracy);
+  expect(analytics.openings[0].average_accuracy).toBe(expectedAccuracy);
   await captureEvidence(page, "09-real-stockfish-review");
 
   const puzzlesResponse = await page.request.get(`${apiBase}/puzzles?limit=20`, { headers });
