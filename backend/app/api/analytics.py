@@ -30,7 +30,7 @@ def analytics(
     openings = db.scalars(
         select(OpeningStat)
         .where(OpeningStat.user_id == user_id)
-        .order_by(OpeningStat.games_count.desc(), OpeningStat.avg_accuracy.desc())
+        .order_by(OpeningStat.games_count.desc(), OpeningStat.avg_accuracy.desc().nulls_last())
     ).all()
     endgames = db.scalars(
         select(EndgameStat)

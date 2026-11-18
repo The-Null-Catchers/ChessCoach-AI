@@ -138,8 +138,8 @@ function EvaluationGraph({
     return [{ ply: item.ply, label, value: Math.max(-800, Math.min(800, whitePerspective)) }];
   });
 
-  if (graph.length < 2) {
-    return <p className="muted">The evaluation graph will appear when enough analyzed moves are available.</p>;
+  if (graph.length === 0) {
+    return <p className="muted">The evaluation graph will appear when analyzed moves are available.</p>;
   }
 
   const width = 600;
