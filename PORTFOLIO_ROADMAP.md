@@ -1,54 +1,52 @@
-# ChessCoach-AI — خطة البورتفيليو
+# ChessCoach-AI portfolio roadmap
 
-مرجع التقييم الأساسي: 17 نوفمبر 2026. تحديث نشر الخطة داخل المستودع: 18 نوفمبر 2026.
+Baseline reviewed on November 17, 2026. Repository roadmap published on November 18, 2026.
 
-الخطة خاصة بهذا المستودع، ومستخلصة من خطة Null Catchers المشتركة. وصف «الموجود الموثق» يعكس المراجعة بتاريخها؛ تحقّق من الكود ووثائق الحالة الحالية قبل إنشاء مهمة جديدة. لا تعِد تنفيذ ميزة موجودة، ولا تعتبر وجود تعريف CI دليلًا على نجاح تشغيله.
+This roadmap applies to this repository and follows the shared Null Catchers portfolio plan. Verify the documented state against the current code and runs before starting work.
 
-**تقدير شريحة العرض الأولى:** 12–20 ساعة. التقدير تخطيطي لمطور يعرف المشروع، ويستثني انتظار حسابات المتاجر والمراجعات الخارجية وتجهيز بيئة الهدف. لا يغطي جميع بنود P2.
+**Estimated initial demo effort** 12–20 hours for a developer familiar with the project. The estimate excludes external reviews, store accounts, target environment setup, and later milestones.
 
-## الأولويات الخاصة بالمشروع
+## Project priorities
 
-**الموجود الموثق:** تحليل Stockfish، استيراد PGN، مراجعة المباراة، ألغاز شخصية، خطط تدريب، web وFlutter. README يصف نطاق البورتفيليو بأنه مكتمل برمجيًا، وتوجد آلية مخصصة لالتقاط أدلة العرض.
+**Documented state** The app supports Stockfish analysis, PGN import, game review, personal puzzles, and training plans on web and Flutter. The repository documents how to capture demo evidence.
 
-**P0 — استكمال نسخة العرض** أعد تصوير مراجعة مباراة مختارة بعد إصلاح عرض كش مات وتجميع الدقة. أنجز تسجيلًا نهائيًا قصيرًا واربطه بإصدار.
+**P0 — Demo** Recapture a game review after the forced-mate display and accuracy fixes. Produce a short, versioned walkthrough.
 
-**P1 — القيمة المميزة:** اعرض كيف تتحول غلطة من مباراة إلى لغز ثم تتغير خطة التدريب. أضف قياس زمن تحليل ملف ثابت، وبيّن الفرق بين نتيجة المحرك وشرح المزود وfallback، دون تقديم البيانات المجهزة كتقدم لاعب حقيقي.
+**P1 — Validation and depth** Show how a mistake becomes a puzzle and changes the training plan. Time analysis of a fixed PGN and identify which outputs come from Stockfish, the explanation provider, or its fallback. Label seeded progress.
 
-**P2 — لاحقًا:** حسّن onboarding والاستيراد من المزودين بناءً على ملاحظات التجربة؛ لا تضف مزيدًا من أقسام التدريب قبل نشر العرض الأول.
+**P2 — Later** Improve onboarding and import providers based on demo feedback before adding training sections.
 
-**معيار الإنجاز:** لقطات بإصدار معروف، تحليل حقيقي يعاد تشغيله، لغز قابل للحل مع حفظ التقييم، وفشل مزود الشرح لا يغير نتائج Stockfish.
+**Acceptance criteria** The evidence identifies the revision. Engine analysis is reproducible, solving the puzzle saves progress, and explanation provider failures leave the Stockfish result intact.
 
-**الديمو:** استيراد مباراة → خطأ حرج → أفضل خط → لغز شخصي → تحديث التدريب. **الأدلة:** [README](https://github.com/The-Null-Catchers/ChessCoach-AI/blob/main/README.md)، [Portfolio Evidence](https://github.com/The-Null-Catchers/ChessCoach-AI/blob/main/PORTFOLIO_EVIDENCE.md).
+**Demo scenario** Import a game → inspect a critical mistake and the best line → solve a personal puzzle → review the training update. [README](https://github.com/The-Null-Catchers/ChessCoach-AI/blob/main/README.md), [Portfolio Evidence](https://github.com/The-Null-Catchers/ChessCoach-AI/blob/main/PORTFOLIO_EVIDENCE.md).
 
-## الدفعة التالية
+## Next milestones
 
-**ما ثبت حتى الآن**
+[PR #44](https://github.com/The-Null-Catchers/ChessCoach-AI/pull/44) captured real Stockfish analysis. [PR #47](https://github.com/The-Null-Catchers/ChessCoach-AI/pull/47) closed [issue #45](https://github.com/The-Null-Catchers/ChessCoach-AI/issues/45) with forced-mate and accuracy fixes and tests for terminal positions and missing scores.
 
-التقط [PR #44](https://github.com/The-Null-Catchers/ChessCoach-AI/pull/44) أدلة تحليل Stockfish. أغلق [PR #47](https://github.com/The-Null-Catchers/ChessCoach-AI/pull/47) مشكلة عرض كش مات والدقة [#45](https://github.com/The-Null-Catchers/ChessCoach-AI/issues/45)، مع اختبارات للمواقف النهائية والدرجات المفقودة.
+1. [ ] Use a fixed PGN with forced mate and a mistake that can become a puzzle. Confirm that review shows the mate and best line and that analysis reruns from the release.
+2. [ ] Solve the resulting puzzle, verify that progress persists across reopening, and identify newly generated results and seeded data in the demo.
+3. [ ] Record 60–120 seconds and capture fresh screenshots. Add the SHA, PGN, reproduction steps, and engine verification to the [evidence index](PORTFOLIO_EVIDENCE.md).
 
-1. [ ] اختر PGN ثابتًا يتضمن موقف كش مات إجباريًا وخطأ قابلًا للتحويل إلى لغز. يُقبل البند عندما تُعرض نتيجة المات والخط الأفضل في مراجعة اللعبة، ويمكن إعادة التحليل من نسخة الإصدار.
-2. [ ] أكمل اللغز الناتج وسجّل تغير خطة التدريب. يُقبل البند عندما يبقى التقدم محفوظًا بعد إعادة الفتح، وتوضح شاشة العرض ما جاء من تحليلك وما جاء من البيانات التجريبية.
-3. [ ] جهّز تسجيلًا من 60 إلى 120 ثانية ولقطات محدثة. يُقبل البند عندما يتضمن [فهرس الأدلة](PORTFOLIO_EVIDENCE.md) SHA وPGN وخطوات التشغيل والتحقق من نتيجة Stockfish.
+## Portfolio acceptance checklist
 
-## بوابة قبول نسخة البورتفيليو
+- [ ] Another person can reproduce the primary workflow from a clean checkout using the README and test credentials or fixtures.
+- [ ] The demo tells one complete story with a defined user, problem, and saved result.
+- [ ] Tests cover the main flow, an important failure, and access boundaries when multiple accounts are involved.
+- [ ] Demo data is labeled synthetic and reproducible. Review screenshots and recordings for secrets and customer data.
+- [ ] Include four to six real screenshots where appropriate, a 60–120 second recording, and working links. Identify the revision used for capture.
+- [ ] The README describes implemented capabilities, setup, architecture, limits, tests, and the demo.
+- [ ] A short case study explains two engineering decisions, a considered alternative, and how the system handles an actual failure.
+- [ ] Release evidence records the commit SHA, CI, prerequisites, and limits. Performance data includes workload, hardware, and method.
+- [ ] Licensing and contributor attribution are settled before distribution. Choose the license for each repository individually.
 
-- [ ] يستطيع شخص آخر تشغيل المسار الرئيسي من checkout نظيف، باتباع README، دون أسرار شخصية.
-- [ ] توجد قصة واحدة مكتملة: مستخدم محدد، مشكلة محددة، ومسار بداية إلى نتيجة محفوظة.
-- [ ] ينجح اختبار للمسار الرئيسي وحالة فشل مهمة، وتُختبر حدود الصلاحيات حيث توجد حسابات متعددة.
-- [ ] توجد بيانات عرض اصطناعية معلنة، قابلة لإعادة الإنشاء؛ ولا توجد بيانات عملاء أو أسرار في اللقطات.
-- [ ] توجد 4–6 لقطات حقيقية أو العدد الملائم للأداة، وفيديو 60–120 ثانية، وروابط تعمل. تُلتقط الأدلة من إصدار معروف.
-- [ ] README يوضح المزايا الفعلية، طريقة التشغيل، الرسم المعماري، القيود، وروابط الاختبارات والديمو.
-- [ ] Case study قصيرة تشرح قرارين هندسيين، بديلًا جرى استبعاده ولماذا، وفشلًا حقيقيًا وكيف يعالجه النظام.
-- [ ] صفحة Release تسجل SHA وCI والمتطلبات والقيود. لا تُنشر أرقام أداء دون workload وعتاد وطريقة قياس.
-- [ ] حُسمت سياسة الترخيص ونسب المساهمات قبل التوزيع؛ لا نختار ترخيصًا تلقائيًا لجميع المستودعات.
+A hosted demo is optional. Code execution, server administration, and secret management can be demonstrated through a recording and a reproducible isolated environment. Keep public demo access scoped to the activities it needs.
 
-الديمو المستضاف مفيد وليس شرطًا لكل أداة. أدوات تنفيذ الكود وإدارة الخوادم والأسرار يمكن عرضها بفيديو وبيئة معزولة وتجربة محلية قابلة للإعادة. لا تفتح تنفيذًا عامًا غير محدود لمجرد وجود رابط بورتفيليو.
+## Implementation and follow-up
 
-## التنفيذ والمتابعة
-
-- حوّل P0 إلى مهام صغيرة، لكل منها سلوك متوقع ومعيار قبول واختبار مناسب.
-- ابدأ بتأكيد الموجود؛ عدّل هذه الخطة عندما يغلق بند بدليل مرتبط بcommit أو PR.
-- سجّل مصدر بيانات الديمو، والـSHA الذي التُقطت منه الأدلة، وحدود التجربة الفعلية.
-- راجع الفرق النهائي وانتظر نجاح الفحوص المطلوبة لنفس SHA قبل الدمج، مع احترام حماية الفرع.
-- إذا كان التعديل وثائق فقط ولا يوجد فحص ينطبق عليه، سجّل التحقق من محتواها وروابطها؛ لا تسجل اختبارات تشغيل لم تُنفّذ.
-- لا تُنشر أرقام أداء أو ادعاءات أمان أو جاهزية إنتاج بلا دليل مناسب.
+- Break P0 into tasks with expected behavior, acceptance criteria, and a suitable test.
+- Verify existing functionality first. Update this plan when evidence tied to a commit or PR closes a milestone.
+- Record the fixture source, the revision used for evidence, and the tested limits.
+- Review the final diff and verify required checks for its exact SHA before merging. Follow branch protection.
+- For documentation-only changes with no applicable workflow, verify content and links and record the checks actually performed.
+- Tie performance, security, and readiness claims to supporting evidence.
