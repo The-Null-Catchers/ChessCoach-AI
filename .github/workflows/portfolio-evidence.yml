@@ -69,23 +69,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          email="portfolio-evidence-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.com"
+          email="portfolio-evidence-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT@example.com"
           password="$(openssl rand -hex 24)"
           jwt_secret="$(openssl rand -hex 32)"
-          echo "::add-mask::${password}"
-          echo "::add-mask::${jwt_secret}"
-          echo "PORTFOLIO_DEMO_EMAIL=${email}" >> "$GITHUB_ENV"
-          echo "PORTFOLIO_DEMO_PASSWORD=${password}" >> "$GITHUB_ENV"
-          echo "JWT_SECRET=${jwt_secret}" >> "$GITHUB_ENV"
+          echo "::add-mask::$password"
+          echo "::add-mask::$jwt_secret"
+          echo "PORTFOLIO_DEMO_EMAIL=$email" >> "$GITHUB_ENV"
+          echo "PORTFOLIO_DEMO_PASSWORD=$password" >> "$GITHUB_ENV"
+          echo "JWT_SECRET=$jwt_secret" >> "$GITHUB_ENV"
 
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
-      - name: Install real analysis engine
+      - name: Install real analysis engine and media tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y stockfish
+          sudo apt-get install -y stockfish ffmpeg
+          ffprobe -version
 
       - name: Install backend dependencies and seed deterministic demo
         run: |
@@ -162,6 +163,32 @@ jobs:
           cat /tmp/chesscoach-portfolio-api.log || true
           cat /tmp/chesscoach-portfolio-web.log || true
           cat /tmp/chesscoach-portfolio-worker.log || true
+
+      - name: Inventory raw browser recording durations
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import pathlib
+          import subprocess
+          videos = sorted(pathlib.Path("web/test-results").rglob("video.webm"))
+          rows = []
+          for video in videos:
+              result = subprocess.run(
+                  ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                   "-of", "default=noprint_wrappers=1:nokey=1", str(video)],
+                  capture_output=True, text=True, check=False,
+              )
+              duration = float(result.stdout.strip()) if result.returncode == 0 and result.stdout.strip() else None
+              rows.append({"path": str(video), "duration_seconds": duration,
+                           "in_presentation_range": duration is not None and 60 <= duration <= 120})
+          output = pathlib.Path("web/portfolio-evidence/video-duration-inventory.json")
+          output.parent.mkdir(parents=True, exist_ok=True)
+          output.write_text(json.dumps({"raw_recordings": rows,
+              "note": "Raw browser recordings are not an edited presentation video."}, indent=2) + "\n")
+          print(output.read_text())
+          PY
 
       - name: Upload portfolio evidence
         if: always()
