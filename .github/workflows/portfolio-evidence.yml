@@ -69,23 +69,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          email="portfolio-evidence-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.com"
+          email="portfolio-evidence-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT@example.com"
           password="$(openssl rand -hex 24)"
           jwt_secret="$(openssl rand -hex 32)"
-          echo "::add-mask::${password}"
-          echo "::add-mask::${jwt_secret}"
-          echo "PORTFOLIO_DEMO_EMAIL=${email}" >> "$GITHUB_ENV"
-          echo "PORTFOLIO_DEMO_PASSWORD=${password}" >> "$GITHUB_ENV"
-          echo "JWT_SECRET=${jwt_secret}" >> "$GITHUB_ENV"
+          echo "::add-mask::$password"
+          echo "::add-mask::$jwt_secret"
+          echo "PORTFOLIO_DEMO_EMAIL=$email" >> "$GITHUB_ENV"
+          echo "PORTFOLIO_DEMO_PASSWORD=$password" >> "$GITHUB_ENV"
+          echo "JWT_SECRET=$jwt_secret" >> "$GITHUB_ENV"
 
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
-      - name: Install real analysis engine
+      - name: Install real analysis engine and media tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y stockfish
+          sudo apt-get install -y stockfish ffmpeg
+          ffprobe -version
 
       - name: Install backend dependencies and seed deterministic demo
         run: |
@@ -104,7 +105,7 @@ jobs:
           with chess.engine.SimpleEngine.popen_uci('/usr/games/stockfish') as engine:
               name = engine.id['name']
           with open(os.environ['GITHUB_ENV'], 'a') as env:
-              env.write(f'PORTFOLIO_ENGINE_NAME={name}\n')
+              env.write(f'PORTFOLIO_ENGINE_NAME={name}\\n')
           PY
 
       - name: Start API
@@ -185,7 +186,7 @@ jobs:
           output = pathlib.Path("web/portfolio-evidence/video-duration-inventory.json")
           output.parent.mkdir(parents=True, exist_ok=True)
           output.write_text(json.dumps({"raw_recordings": rows,
-              "note": "Raw browser recordings are not an edited presentation video."}, indent=2) + "\n")
+              "note": "Raw browser recordings are not an edited presentation video."}, indent=2) + "\\n")
           print(output.read_text())
           PY
 
