@@ -42,7 +42,7 @@ test("registers, opens the game library, and reaches admin operations", async ({
 
 
 test("runs the critical coaching loop from PGN import through puzzle mastery", async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
 
   const email = `coach-e2e-${Date.now()}@example.com`;
   await page.goto("/login");
@@ -98,6 +98,7 @@ test("runs the critical coaching loop from PGN import through puzzle mastery", a
       fen_before: string;
       analysis: null | {
         best_move: string | null;
+        candidates: Array<{ move: string; pv: string }>;
         classification: string;
         depth: number;
         profile: string;
@@ -120,6 +121,10 @@ test("runs the critical coaching loop from PGN import through puzzle mastery", a
   await expect(graph.locator("circle")).toHaveCount(4);
   await expect(graph.locator("title").last()).toHaveText("Ply 4: Checkmate");
   await expect(page.locator(".move-heading strong")).toHaveText("M-1");
+  const bestLine = analysis.moves[2].analysis!.candidates[0];
+  expect(bestLine?.move).toBe(analysis.moves[2].analysis!.best_move);
+  expect(bestLine?.pv).toBeTruthy();
+  await expect(page.locator(".candidate-line").first().locator("code")).toHaveText(bestLine.pv);
 
   const analyticsResponse = await page.request.get(`${apiBase}/analytics`, { headers });
   expect(analyticsResponse.ok()).toBeTruthy();
@@ -167,17 +172,48 @@ test("runs the critical coaching loop from PGN import through puzzle mastery", a
   expect(training.reviewed_puzzles).toBeGreaterThanOrEqual(1);
   expect(training.puzzle_mastery).toBeGreaterThan(0);
 
+  const reopenedTraining = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === "/api/v1/training" && response.request().method() === "GET",
+  );
   await page.goto("/training");
+  const persistedTraining = await reopenedTraining;
+  expect(persistedTraining.ok()).toBeTruthy();
+  expect(await persistedTraining.json()).toMatchObject({
+    reviewed_puzzles: training.reviewed_puzzles,
+    puzzle_mastery: training.puzzle_mastery,
+  });
   await expect(page.locator(".training-summary")).toBeVisible();
   await captureEvidence(page, "12-real-training-after-review");
   if (evidenceEnabled) {
     expect(process.env.PORTFOLIO_ENGINE_NAME).toMatch(/Stockfish/i);
   }
+  const rerun = await page.request.post(`${apiBase}/games/${gameId}/player`, {
+    headers,
+    data: { color: "white" },
+  });
+  expect(rerun.status()).toBe(202);
+  const { job_id: rerunJobId } = await rerun.json() as { job_id: string };
+  await expect.poll(async () => {
+    const job = await page.request.get(`${apiBase}/analysis-jobs/${rerunJobId}`, { headers });
+    expect(job.ok()).toBeTruthy();
+    const { status, progress } = await job.json() as { status: string; progress: number };
+    return { status, progress };
+  }, { timeout: 45_000 }).toEqual({ status: "complete", progress: 100 });
+
+  const rerunAnalysis = await page.request.get(`${apiBase}/games/${gameId}/analysis`, { headers });
+  expect(rerunAnalysis.ok()).toBeTruthy();
+  const rerunMoves = (await rerunAnalysis.json() as typeof analysis).moves;
+  expect(rerunMoves[2].analysis).toMatchObject({ classification: "blunder", mate_after: -1 });
+  expect(rerunMoves[3].analysis).toMatchObject({ mate_after: 0, checkmate: true });
+
   recordEvidence("real-analysis", {
     scenario: "PGN import -> Stockfish worker -> game review -> personal puzzle -> persisted mastery",
     data_origin: "fresh synthetic four-ply PGN, analyzed by the real engine; not demo seed",
     engine_name: process.env.PORTFOLIO_ENGINE_NAME ?? null,
     ai_provider: "template",
+    pgn,
+    reanalysis_completed: true,
+    mastery_verified_on_reopen: true,
     pgn_sha256: createHash("sha256").update(pgn).digest("hex"),
     import_to_completion_ms: importToCompletionMs,
     analysis: analysis.moves.map((move) => move.analysis),

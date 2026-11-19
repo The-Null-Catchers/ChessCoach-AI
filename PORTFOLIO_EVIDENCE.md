@@ -12,7 +12,7 @@ ChessCoach AI includes a GitHub Actions workflow named **Portfolio Evidence** th
 5. Grants admin access only after a second explicit guard verifies the account contains `portfolio_demo` games.
 6. Starts the FastAPI and Next.js applications locally on the runner.
 7. Starts Stockfish-backed Celery analysis and records the installed engine's UCI identity.
-8. Runs the dedicated presentation spec and the existing critical-coaching-loop browser test, including fresh PGN import, real worker completion, positive analysis depths, engine review, a personal puzzle and persisted mastery.
+8. Runs the dedicated presentation spec and the existing critical-coaching-loop browser test, including fresh PGN import, real worker completion, positive analysis depths, engine review with the best candidate line, a personal puzzle, mastery checked after reopening the training page, and reanalysis of the same game.
 9. Uploads screenshots, success-path browser videos, JSON evidence manifests and the Playwright report as a 30-day workflow artifact.
 
 The seeded presentation story does not run Stockfish. The separate real-analysis story does run local Stockfish and Celery. Neither story contacts Lichess, Chess.com, a hosted LLM, external SMTP, push providers or the production deployment. Coaching explanations use the deterministic template provider, not a hosted AI model.
@@ -34,7 +34,7 @@ The artifact contains:
 - `11-real-puzzle-solved.png`
 - `12-real-training-after-review.png`
 - `seeded-story.json` — marks synthetic historical progress explicitly.
-- `real-analysis.json` — records engine identity, PGN SHA-256, analysis depths/profiles, import-to-completion wall time, source-puzzle linkage and persisted mastery after successful assertions.
+- `real-analysis.json` — records engine identity, the synthetic PGN and its SHA-256, reanalysis and reload results, analysis depths/profiles, import-to-completion wall time, source-puzzle linkage and persisted mastery after successful assertions.
 
 Both manifests record the tested checkout SHA, source/head SHA, run ID and attempt. On a pull request, GitHub's tested checkout can be a synthetic merge commit; do not label it as the source SHA or an already-published release.
 
