@@ -105,7 +105,7 @@ jobs:
           with chess.engine.SimpleEngine.popen_uci('/usr/games/stockfish') as engine:
               name = engine.id['name']
           with open(os.environ['GITHUB_ENV'], 'a') as env:
-              env.write(f'PORTFOLIO_ENGINE_NAME={name}\\n')
+              env.write(f'PORTFOLIO_ENGINE_NAME={name}\n')
           PY
 
       - name: Start API
@@ -186,7 +186,7 @@ jobs:
           output = pathlib.Path("web/portfolio-evidence/video-duration-inventory.json")
           output.parent.mkdir(parents=True, exist_ok=True)
           output.write_text(json.dumps({"raw_recordings": rows,
-              "note": "Raw browser recordings are not an edited presentation video."}, indent=2) + "\\n")
+              "note": "Raw browser recordings are not an edited presentation video."}, indent=2) + "\n")
           print(output.read_text())
           PY
 
