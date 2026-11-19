@@ -22,10 +22,12 @@ This roadmap applies to this repository and follows the shared Null Catchers por
 
 ## Next milestones
 
+Verified checkpoint: [PR #50](https://github.com/The-Null-Catchers/ChessCoach-AI/pull/50) is merged. The [Portfolio Evidence run 44442303199](https://github.com/The-Null-Catchers/ChessCoach-AI/actions/runs/44442303199) passed E2E, CI, and Portfolio Evidence jobs; its artifact includes the synthetic PGN, engine provenance, screenshots, and browser recording. The remaining item is to confirm the recording duration meets the 60–120 second presentation requirement.
+
 [PR #44](https://github.com/The-Null-Catchers/ChessCoach-AI/pull/44) captured real Stockfish analysis. [PR #47](https://github.com/The-Null-Catchers/ChessCoach-AI/pull/47) closed [issue #45](https://github.com/The-Null-Catchers/ChessCoach-AI/issues/45) with forced-mate and accuracy fixes and tests for terminal positions and missing scores.
 
-1. [ ] Use a fixed PGN with forced mate and a mistake that can become a puzzle. Confirm that review shows the mate and best line and that analysis reruns from the release.
-2. [ ] Solve the resulting puzzle, verify that progress persists across reopening, and identify newly generated results and seeded data in the demo.
+1. [x] Use a fixed PGN with forced mate and a mistake that can become a puzzle. Confirm that review shows the mate and best line and that analysis reruns from the release. Verified by [PR #50](https://github.com/The-Null-Catchers/ChessCoach-AI/pull/50).
+2. [x] Solve the resulting puzzle, verify that progress persists across reopening, and identify newly generated results and seeded data in the demo. Verified by [PR #50](https://github.com/The-Null-Catchers/ChessCoach-AI/pull/50) and its `real-analysis.json` artifact manifest.
 3. [ ] Record 60–120 seconds and capture fresh screenshots. Add the SHA, PGN, reproduction steps, and engine verification to the [evidence index](PORTFOLIO_EVIDENCE.md).
 
 ## Portfolio acceptance checklist
