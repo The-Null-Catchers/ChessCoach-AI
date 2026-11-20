@@ -213,7 +213,13 @@ jobs:
           data = json.loads(manifest.read_text())
           data["duration_seconds"] = round(duration, 2)
           data["duration_verified_by"] = "ffprobe"
-          manifest.write_text(json.dumps(data, indent=2) + "\\n")
+          manifest.write_text(json.dumps(data, indent=2) + "\n")
+          assert json.loads(manifest.read_text())["duration_seconds"] == round(duration, 2)
+          required = ["real-analysis.json", "seeded-story.json", "01-dashboard-desktop.png",
+                      "09-real-stockfish-review.png", "12-real-training-after-review.png"]
+          missing = [name for name in required if not (manifest.parent / name).is_file()]
+          if missing:
+              raise SystemExit(f"Missing portfolio evidence files: {missing}")
           print(f"Verified {path}: {duration:.2f}s")
           PY
 
