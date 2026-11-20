@@ -28,7 +28,7 @@ Verified checkpoint: [PR #50](https://github.com/The-Null-Catchers/ChessCoach-AI
 
 1. [x] Use a fixed PGN with forced mate and a mistake that can become a puzzle. Confirm that review shows the mate and best line and that analysis reruns from the release. Verified by [PR #50](https://github.com/The-Null-Catchers/ChessCoach-AI/pull/50).
 2. [x] Solve the resulting puzzle, verify that progress persists across reopening, and identify newly generated results and seeded data in the demo. Verified by [PR #50](https://github.com/The-Null-Catchers/ChessCoach-AI/pull/50) and its `real-analysis.json` artifact manifest.
-3. [ ] Record 60–120 seconds and capture fresh screenshots. Add the SHA, PGN, reproduction steps, and engine verification to the [evidence index](PORTFOLIO_EVIDENCE.md).
+3. [x] Record a 60–120 second seeded-UI walkthrough and capture fresh screenshots, with SHA, PGN, reproduction steps and engine verification in the [evidence index](PORTFOLIO_EVIDENCE.md). Verified by [PR #53](https://github.com/The-Null-Catchers/ChessCoach-AI/pull/53) and [Portfolio Evidence run 44783853322](https://github.com/The-Null-Catchers/ChessCoach-AI/actions/runs/44783853322): 5 browser tests passed and ffprobe measured 91.60 seconds. The video is synthetic-UI presentation evidence, not a recording of the real Stockfish run; inspect the actual media before publishing.
 
 ## Portfolio acceptance checklist
 
