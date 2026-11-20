@@ -17,6 +17,14 @@ ChessCoach AI includes a GitHub Actions workflow named **Portfolio Evidence** th
 
 The seeded presentation story does not run Stockfish. The separate real-analysis story does run local Stockfish and Celery. Neither story contacts Lichess, Chess.com, a hosted LLM, external SMTP, push providers or the production deployment. Coaching explanations use the deterministic template provider, not a hosted AI model.
 
+## Presentation walkthrough gate
+
+The portfolio workflow also records `portfolio-walkthrough.webm`, a 1280×720 browser walkthrough of the **synthetic seeded UI**. Authentication occurs before recording; the video contains an explicit synthetic-data label and visits the dashboard, game library, review, analytics, training, and puzzles. It is distinct from the fresh Stockfish scenario in `real-analysis.json`.
+
+The workflow uses `ffprobe` to reject the final walkthrough if it is missing or shorter than 60 seconds or longer than 120 seconds. The validated duration is written to `walkthrough.json`, along with browser version and provenance. The video and manifest are included in the same time-limited artifact as the screenshots.
+
+**Do not claim the video exists or passed until the exact PR or main workflow run succeeds.** Inspect it for secrets and readable chapter content before publication. See the [engineering case study](docs/PORTFOLIO_CASE_STUDY.md).
+
 ## Captured evidence
 
 The artifact contains:

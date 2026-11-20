@@ -73,6 +73,14 @@ Web: `http://localhost:3000`
 
 A deterministic demo account can be generated without external chess providers or an LLM. See [`PORTFOLIO_DEMO.md`](PORTFOLIO_DEMO.md) for the guarded seed command, screenshot order, and recommended 60–90 second walkthrough.
 
+## Portfolio case study and evidence
+
+- [Engineering case study](docs/PORTFOLIO_CASE_STUDY.md): problem, design tradeoffs, failure handling and tested limits.
+- [Evidence workflow](PORTFOLIO_EVIDENCE.md): isolated Stockfish E2E, synthetic presentation screenshots and a versioned 60–120 second browser walkthrough.
+- [Portfolio roadmap](PORTFOLIO_ROADMAP.md): verified milestones and outstanding public-release requirements.
+
+The portfolio workflow stores media as time-limited GitHub Actions artifacts. A passing capture does not by itself constitute public media review, a permanent demo link, a production deployment or a licensing decision.
+
 ## Main user flow
 
 Register → import PGN → analysis worker processes the game → inspect critical moments and coaching explanations → receive a puzzle generated from the user's own game → solve and grade it → spaced repetition and weakness statistics update → training plan adapts.
